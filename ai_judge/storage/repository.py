@@ -1,0 +1,134 @@
+from dataclasses import dataclass
+from datetime import datetime
+from uuid import UUID, uuid4
+
+import sqlalchemy as sa
+from sqlalchemy import Connection
+
+from ai_judge.contracts import AttackData, AttackTemplate
+from ai_judge.storage.tables import attack_templates, attacks
+
+
+class ReferenceError(ValueError):
+    """The source template is absent or belongs to a different category."""
+
+
+@dataclass(frozen=True)
+class StoredTemplate:
+    id: UUID
+    data: AttackTemplate
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class StoredAttack:
+    id: UUID
+    data: AttackData
+    source_template_id: UUID | None
+    created_at: datetime
+
+
+class Repository:
+    """All methods participate in the caller's Database.transaction()."""
+
+    def __init__(self, connection: Connection):
+        self.connection = connection
+
+    def add_template(self, data: AttackTemplate) -> UUID:
+        data = AttackTemplate.model_validate(data.model_dump())
+        record_id = uuid4()
+        self.connection.execute(
+            attack_templates.insert().values(
+                id=record_id,
+                risk_subcategory=data.risk_subcategory,
+                payload=data.model_dump(),
+            )
+        )
+        return record_id
+
+    def add_attacks(
+        self,
+        data: list[AttackData],
+        *,
+        source_template_id: UUID | None = None,
+    ) -> list[UUID]:
+        validated = [AttackData.model_validate(item.model_dump()) for item in data]
+        if not validated:
+            return []
+        if source_template_id is not None:
+            template = self.get_template(source_template_id)
+            if template is None or any(
+                item.subcategory != template.data.risk_subcategory for item in validated
+            ):
+                raise ReferenceError("Source template missing or category mismatch")
+        ids = [uuid4() for _ in validated]
+        self.connection.execute(
+            attacks.insert(),
+            [
+                dict(
+                    id=record_id,
+                    subcategory=item.subcategory,
+                    payload=item.model_dump(),
+                    source_template_id=source_template_id,
+                )
+                for record_id, item in zip(ids, validated, strict=True)
+            ],
+        )
+        return ids
+
+    def get_template(self, record_id: UUID) -> StoredTemplate | None:
+        row = (
+            self.connection.execute(
+                sa.select(attack_templates).where(attack_templates.c.id == record_id)
+            )
+            .mappings()
+            .first()
+        )
+        return (
+            None
+            if row is None
+            else StoredTemplate(
+                row["id"],
+                AttackTemplate.model_validate(row["payload"]),
+                row["created_at"],
+            )
+        )
+
+    def get_attack(self, record_id: UUID) -> StoredAttack | None:
+        row = (
+            self.connection.execute(sa.select(attacks).where(attacks.c.id == record_id))
+            .mappings()
+            .first()
+        )
+        return None if row is None else self._attack(row)
+
+    def list_attacks(
+        self,
+        *,
+        subcategory: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[StoredAttack]:
+        if not 1 <= limit <= 1000 or offset < 0:
+            raise ValueError("limit must be 1..1000 and offset must be nonnegative")
+        query = sa.select(attacks)
+        if subcategory is not None:
+            query = query.where(attacks.c.subcategory == subcategory)
+        rows = self.connection.execute(
+            query.order_by(
+                attacks.c.created_at,
+                attacks.c.id,
+            )
+            .limit(limit)
+            .offset(offset)
+        ).mappings()
+        return [self._attack(row) for row in rows]
+
+    @staticmethod
+    def _attack(row) -> StoredAttack:
+        return StoredAttack(
+            row["id"],
+            AttackData.model_validate(row["payload"]),
+            row["source_template_id"],
+            row["created_at"],
+        )

@@ -5,6 +5,13 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
+from ai_judge.phase1.api_models import (
+    GenerationResult,
+    ImportResult,
+    JobRecord,
+    SamplingResult,
+    error_responses,
+)
 from ai_judge.phase1.generation import GenerationRequest, GenerationService
 from ai_judge.phase1.importers import Importer
 from ai_judge.phase1.operations import Operations
@@ -28,6 +35,8 @@ async def read_body(request: Request, media_type: str) -> bytes | JSONResponse:
 @router.post(
     "/attacks/import",
     status_code=201,
+    response_model=ImportResult,
+    responses=error_responses(409, 413, 415, 422, 503),
     openapi_extra={
         "requestBody": {
             "required": True,
@@ -44,7 +53,9 @@ async def import_attacks(request: Request, x_job_id: UUID | None = Header(defaul
     return JSONResponse(status_code=status, content=result)
 
 
-@router.get("/attack-jobs/{job_id}")
+@router.get(
+    "/attack-jobs/{job_id}", response_model=JobRecord, responses=error_responses(404, 422, 503)
+)
 def get_job(job_id: UUID, request: Request):
     try:
         job = Operations(request.app.state.database).get(job_id)
@@ -58,6 +69,8 @@ def get_job(job_id: UUID, request: Request):
 @router.post(
     "/attack-templates/import",
     status_code=201,
+    response_model=ImportResult,
+    responses=error_responses(409, 413, 415, 422, 503),
     openapi_extra={
         "requestBody": {
             "required": True,
@@ -76,7 +89,12 @@ async def import_templates(request: Request, x_job_id: UUID | None = Header(defa
     return JSONResponse(status_code=status, content=result)
 
 
-@router.post("/attacks/generate", status_code=201)
+@router.post(
+    "/attacks/generate",
+    status_code=201,
+    response_model=GenerationResult,
+    responses=error_responses(404, 409, 422, 429, 502, 503, 504),
+)
 def generate_attack(
     body: GenerationRequest,
     request: Request,
@@ -87,7 +105,12 @@ def generate_attack(
     return JSONResponse(status_code=status, content=result)
 
 
-@router.post("/attacks/sample", status_code=201)
+@router.post(
+    "/attacks/sample",
+    status_code=201,
+    response_model=SamplingResult,
+    responses=error_responses(409, 422, 429, 503),
+)
 def sample_attacks(
     body: SamplingRequest,
     request: Request,

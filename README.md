@@ -131,7 +131,7 @@ GitHub Actions 在功能分支 push 及 PR 執行 lint、格式檢查與完整 P
 
 `.env`、私有設定 `config/local/`、`secrets/`、`data/`、`artifacts/`、日誌、權重與 `.venv/` 已忽略。真實資料與憑證應置於上述路徑或環境變數；每次提交仍需人工檢查，不能僅依賴副檔名規則。
 
-尚未完成：B1-3～B1-4、B2-1～B2-7、B3A-1～B3A-5、B3B、B4-1～B4-8；研究規則待確認項目維持原計畫第 4.4 節。本次依賴的 Starlette 對 httpx TestClient 發出棄用警告，測試仍可執行，後續依相容版本更新。
+尚未完成：B1-4、B2-1～B2-7、B3A-1～B3A-5、B3B、B4-1～B4-8；研究規則待確認項目維持原計畫第 4.4 節。本次依賴的 Starlette 對 httpx TestClient 發出棄用警告，測試仍可執行，後續依相容版本更新。
 
 
 ## 區塊 1：已完成 API
@@ -170,3 +170,31 @@ curl -X POST http://127.0.0.1:8000/api/v1/attacks/import \
 輪次必須從 1 開始且連續、不能重複或顛倒，不限定三輪。任一項無效整批不保存；重複範本保留為新 UUID。錯誤狀態同 B1-1（409／413／415／422／503）；無效 JSON 使用 `invalid_json`，資料契約錯誤使用 `invalid_records`，details 的 record 表示陣列第幾筆（單筆為 1），path 例如 `["rounds"]`。`kind=template_import` 的進度及失敗可由共用 GET 操作介面查詢。不呼叫模型或外部 API。
 
 內部介面：`Importer.templates(raw: bytes, job_id: UUID|None) -> (http_status, result_dict)`；`Repository.add_templates(list[AttackTemplate]) -> list[UUID]` 為 C-1 的參數化批次保存擴充，沿用現有 attack_templates 表，不新增 migration。body／筆數限制及交易、重複操作政策與 B1-1 相同。
+
+
+### B1-3：依指定類別的隨機範本生成攻擊資料
+
+`POST /api/v1/attacks/generate`，Content-Type `application/json`，body 為 `{"risk_subcategory":"synthetic"}`，無 query／path 參數，可選 `X-Job-ID`。以資料庫參數化篩選及 `ORDER BY random() LIMIT 1` 選擇該類別範本；交易結束後才呼叫外部 API，不長時間佔用 DB 連線。回傳經驗證的資料後，再以單一 C-1 交易保存攻擊、來源範本關聯及成功紀錄。
+
+成功 201 schema／範例：`{"job_id":"<UUID>","status":"succeeded","elapsed_ms":25,"id":"<attack UUID>","data":{"subcategory":"synthetic","attack_content":["合成測試"]},"generation":{"provider":"openai_compatible","model":"configured-model","temperature":0.7,"mock":false,"prompt_sha256":"<SHA256>","timeout_seconds":30,"max_attempts":1,"source_template_id":"<template UUID>","provider_elapsed_ms":20}}`。data 保持原始兩欄結構；生成類別必須與範本相同，訊息數須等於範本輪數。
+
+錯誤：404 `no_template_candidates`（不呼叫供應商）；503 `generation_disabled`／`generation_not_configured`／`storage_unavailable`；429 `generation_busy`（本程序並行上限）；504 `provider_timeout`；502 `provider_http_error`／`provider_connection_error`／`provider_response_too_large`／`provider_refused`／`provider_incomplete_output`／`invalid_generated_output`／`generated_category_mismatch`／`generated_round_count_mismatch`。上述結果使用共用 `job_id/status/elapsed_ms/error/details` 格式，來源 UUID、模型參數及呼叫耗時會記在生成失敗的 details；供應商 HTTP 失敗僅保存狀態碼，不回傳供應商原文、憑證或完整提示。request 型態不符回傳 FastAPI 422 validation detail；重複 ID 409。
+
+`kind=generation` 的進度為 0/1 或 1/1。錯誤不保存攻擊、不當作成功、也不切換 mock。每次只有一次供應商請求（max_attempts=1，無自動重試），避免重複付費。客戶端斷線時伺服器可能仍完成操作，應使用原 X-Job-ID 查詢，不直接用新 ID 重試。
+
+| 設定 | 預設／說明 |
+|---|---|
+| `AI_JUDGE_GENAI_ENABLED` | false；須明確啟用 |
+| `AI_JUDGE_GENAI_PROVIDER` | openai_compatible；此階段只有這個正式 adapter |
+| `AI_JUDGE_GENAI_BASE_URL` | 無預設，需包含供應商 API 根路徑如 `/v1`，會加上 `/chat/completions` |
+| `AI_JUDGE_GENAI_API_KEY` | 無預設，SecretStr；僅放本機 .env／環境變數 |
+| `AI_JUDGE_GENAI_MODEL` | 無預設，必填的實際模型名稱 |
+| `AI_JUDGE_GENAI_SYSTEM_PROMPT` | 程式內的合成測試 JSON 輸出提示；可覆寫，紀錄 SHA256 |
+| `AI_JUDGE_GENAI_TIMEOUT_SECONDS` | 30 秒，1～60；HTTP timeout 與接收迴圈耗時檢查 |
+| `AI_JUDGE_GENAI_TEMPERATURE` | 0.7，0～2，僅初始工程參數，非已驗證研究設定 |
+| `AI_JUDGE_GENAI_MAX_RESPONSE_BYTES` | 1,000,000，限制回應大小 |
+| `AI_JUDGE_GENAI_MAX_CONCURRENCY` | 2，每程序最多同時呼叫數 |
+
+adapter 使用共享 httpx client，不跟隨 HTTP redirect、不讀代理環境變數；端點只能從受信任本機設定提供，不能由 API request 指定。上線時請使用 HTTPS；API 本身供授權的內部／本機環境使用。供應商需支援 messages、temperature、JSON object response_format 及完整的 choices/message/finish_reason 回傳；參考 [Chat Completions 官方介面](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create)。不相容或截斷回應會明確失敗，不猜測內容。
+
+內部可替換介面：`Generator.generate(AttackTemplate) -> AttackData`、`Generator.metadata() -> dict`；`GenerationService(operations, generator).generate(GenerationRequest, job_id=None)`。單元測試使用 HTTP transport 替身及注入 Generator，不提供生產環境假資料 fallback。真實供應商、模型及提示版本仍待專案設定確認；本次未進行付費 API 呼叫。`ORDER BY random()` 對極大量範本有掃描成本，受 DB statement timeout 保護。

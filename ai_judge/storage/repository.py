@@ -156,6 +156,29 @@ class Repository:
             )
         )
 
+    def random_template(self, risk_subcategory: str) -> StoredTemplate | None:
+        row = (
+            self.connection.execute(
+                sa.select(attack_templates)
+                .where(
+                    attack_templates.c.risk_subcategory == risk_subcategory,
+                )
+                .order_by(sa.func.random())
+                .limit(1)
+            )
+            .mappings()
+            .first()
+        )
+        return (
+            None
+            if row is None
+            else StoredTemplate(
+                row["id"],
+                AttackTemplate.model_validate(row["payload"]),
+                row["created_at"],
+            )
+        )
+
     def get_attack(self, record_id: UUID) -> StoredAttack | None:
         row = (
             self.connection.execute(sa.select(attacks).where(attacks.c.id == record_id))

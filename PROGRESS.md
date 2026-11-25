@@ -15,8 +15,9 @@
 |---|---|---|
 | 共同區塊 1／C-1 | 已完成，37 項測試通過；已 Commit／Push／建立 PR #1 | 資料契約、連線池、批次持久化、來源關聯、交易回滾、Alembic 遷移、健康檢查 |
 | 區塊 1／B1-1 | 已完成，已 Commit／Push：6754b4f | JSONL 匯入、原子保存、操作及錯誤查詢 |
-| 區塊 1／B1-2 | 已完成單元測試，準備提交 | 單筆／批次範本匯入、輪次驗證 |
-| 區塊 1／B1-3、B1-4 | 未開始 | 按序實作 |
+| 區塊 1／B1-2 | 已完成，已 Commit／Push：20c43f5 | 單筆／批次範本匯入、輪次驗證 |
+| 區塊 1／B1-3 | 已完成單元測試，準備提交 | 隨機範本、可替換 GenAI、驗證及來源保存 |
+| 區塊 1／B1-4 | 未開始 | K-DPP 抽樣 |
 | 區塊 2／B2-1、B2-2、B2-3、B2-4、B2-5、B2-6、B2-7 | 未開始 | 依計畫相依關係實作 |
 | 區塊 3 Path A／B3A-1、B3A-2、B3A-3、B3A-4、B3A-5 | 未開始 | 真實介面與預設停用 mock 待實作 |
 | 區塊 3 Path B／B3B | 未開始 | 可替換的 mock AffordRanker 待實作 |
@@ -64,3 +65,7 @@
 - B1-1 功能 Commit：`6754b4f`，已立即 Push 至 origin/feature/phase1-attacks。
 - B1-2：單筆或陣列封裝範本匯入；驗證輪次順序／型態，整批保存或回滾，保留重複資料。README 與測試同步更新。
 - B1-2：`.venv/bin/python -m pytest tests/unit -q`，60 passed，lint 通過；新增 15 個範本匯入案例。提交訊息 `feat(phase1): implement attack template importer`，Hash 於下一模組補記。
+
+- B1-2 功能 Commit：`20c43f5`，已立即 Push。
+- B1-3：完成可設定的 Chat Completions 正式 adapter、指定類別隨機範本、結果驗證及關聯保存；請求 timeout、回應大小／並行上限、單次呼叫無自動重試、錯誤記錄及憑證遮蔽。預設停用，未呼叫真實付費模型。
+- B1-3：`.venv/bin/python -m pytest tests/unit -q`，77 passed；lint 通過。新增 17 項生成與供應商替身測試。README／.env.example 更新。提交訊息 `feat(phase1): implement template-based GenAI generation`。

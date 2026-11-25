@@ -5,6 +5,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
+from ai_judge.phase1.generation import GenerationRequest, GenerationService
 from ai_judge.phase1.importers import Importer
 from ai_judge.phase1.operations import Operations
 from ai_judge.storage.database import StorageError
@@ -71,4 +72,15 @@ async def import_templates(request: Request, x_job_id: UUID | None = Header(defa
         return raw
     importer = Importer(Operations(request.app.state.database), request.app.state.phase1_settings)
     status, result = await run_in_threadpool(importer.templates, raw, x_job_id)
+    return JSONResponse(status_code=status, content=result)
+
+
+@router.post("/attacks/generate", status_code=201)
+def generate_attack(
+    body: GenerationRequest,
+    request: Request,
+    x_job_id: UUID | None = Header(default=None),
+):
+    service = GenerationService(Operations(request.app.state.database), request.app.state.generator)
+    status, result = service.generate(body, x_job_id)
     return JSONResponse(status_code=status, content=result)

@@ -1,11 +1,13 @@
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import text
 
 from ai_judge.config import Settings
+from ai_judge.phase1.generation import ChatCompletionsGenerator, GenAISettings, Generator
 from ai_judge.phase1.routes import router
 from ai_judge.phase1.settings import Phase1Settings
 from ai_judge.storage.database import Database, StorageError, create_database_engine
@@ -17,15 +19,25 @@ class Health(BaseModel):
 
 
 def create_app(
-    database: Database | None = None, *, phase1_settings: Phase1Settings | None = None
+    database: Database | None = None,
+    *,
+    phase1_settings: Phase1Settings | None = None,
+    generator: Generator | None = None,
+    genai_settings: GenAISettings | None = None,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.database = database or Database(create_database_engine(Settings()))
         app.state.phase1_settings = phase1_settings or Phase1Settings()
+        settings = genai_settings or GenAISettings()
+        client = httpx.Client(
+            follow_redirects=False, trust_env=False, timeout=settings.timeout_seconds
+        )
+        app.state.generator = generator or ChatCompletionsGenerator(settings, client)
         try:
             yield
         finally:
+            client.close()
             if database is None:
                 app.state.database.close()
 

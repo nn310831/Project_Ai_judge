@@ -51,3 +51,24 @@ def get_job(job_id: UUID, request: Request):
     if job is None:
         return JSONResponse(status_code=404, content={"error": "job_not_found"})
     return JSONResponse(content=jsonable_encoder(job))
+
+
+@router.post(
+    "/attack-templates/import",
+    status_code=201,
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {
+                "application/json": {"schema": {"oneOf": [{"type": "object"}, {"type": "array"}]}}
+            },
+        }
+    },
+)
+async def import_templates(request: Request, x_job_id: UUID | None = Header(default=None)):
+    raw = await read_body(request, "application/json")
+    if isinstance(raw, JSONResponse):
+        return raw
+    importer = Importer(Operations(request.app.state.database), request.app.state.phase1_settings)
+    status, result = await run_in_threadpool(importer.templates, raw, x_job_id)
+    return JSONResponse(status_code=status, content=result)

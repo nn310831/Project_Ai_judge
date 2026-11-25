@@ -14,8 +14,9 @@
 | 區塊／模組 | 狀態 | 交付 |
 |---|---|---|
 | 共同區塊 1／C-1 | 已完成，37 項測試通過；已 Commit／Push／建立 PR #1 | 資料契約、連線池、批次持久化、來源關聯、交易回滾、Alembic 遷移、健康檢查 |
-| 區塊 1／B1-1 | 已完成單元測試，準備提交 | JSONL 匯入、原子保存、操作及錯誤查詢 |
-| 區塊 1／B1-2、B1-3、B1-4 | 未開始 | 按序實作 |
+| 區塊 1／B1-1 | 已完成，已 Commit／Push：6754b4f | JSONL 匯入、原子保存、操作及錯誤查詢 |
+| 區塊 1／B1-2 | 已完成單元測試，準備提交 | 單筆／批次範本匯入、輪次驗證 |
+| 區塊 1／B1-3、B1-4 | 未開始 | 按序實作 |
 | 區塊 2／B2-1、B2-2、B2-3、B2-4、B2-5、B2-6、B2-7 | 未開始 | 依計畫相依關係實作 |
 | 區塊 3 Path A／B3A-1、B3A-2、B3A-3、B3A-4、B3A-5 | 未開始 | 真實介面與預設停用 mock 待實作 |
 | 區塊 3 Path B／B3B | 未開始 | 可替換的 mock AffordRanker 待實作 |
@@ -59,3 +60,7 @@
 - B1-1 單元測試：`.venv/bin/python -m pytest tests/unit -q`，45 passed；lint 通過。提交訊息 `feat(phase1): implement JSONL dataset importer`；Hash 在下一模組紀錄補記，不改寫歷史。
 
 - B1-1 全套測試（含隔離 PostgreSQL）：48 passed、0 failed、0 skipped；遷移與既有功能回歸通過，1 項已知 TestClient 棄用警告。
+
+- B1-1 功能 Commit：`6754b4f`，已立即 Push 至 origin/feature/phase1-attacks。
+- B1-2：單筆或陣列封裝範本匯入；驗證輪次順序／型態，整批保存或回滾，保留重複資料。README 與測試同步更新。
+- B1-2：`.venv/bin/python -m pytest tests/unit -q`，60 passed，lint 通過；新增 15 個範本匯入案例。提交訊息 `feat(phase1): implement attack template importer`，Hash 於下一模組補記。

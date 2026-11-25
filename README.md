@@ -131,7 +131,7 @@ GitHub Actions 在功能分支 push 及 PR 執行 lint、格式檢查與完整 P
 
 `.env`、私有設定 `config/local/`、`secrets/`、`data/`、`artifacts/`、日誌、權重與 `.venv/` 已忽略。真實資料與憑證應置於上述路徑或環境變數；每次提交仍需人工檢查，不能僅依賴副檔名規則。
 
-尚未完成：B1-2～B1-4、B2-1～B2-7、B3A-1～B3A-5、B3B、B4-1～B4-8；研究規則待確認項目維持原計畫第 4.4 節。本次依賴的 Starlette 對 httpx TestClient 發出棄用警告，測試仍可執行，後續依相容版本更新。
+尚未完成：B1-3～B1-4、B2-1～B2-7、B3A-1～B3A-5、B3B、B4-1～B4-8；研究規則待確認項目維持原計畫第 4.4 節。本次依賴的 Starlette 對 httpx TestClient 發出棄用警告，測試仍可執行，後續依相容版本更新。
 
 
 ## 區塊 1：已完成 API
@@ -161,3 +161,12 @@ curl -X POST http://127.0.0.1:8000/api/v1/attacks/import \
 設定：`AI_JUDGE_PHASE1_MAX_BODY_BYTES` 預設 2,000,000（最多 20,000,000）；`AI_JUDGE_PHASE1_MAX_IMPORT_RECORDS` 預設 1,000（最多 10,000）。目前適合受限批次，較大量資料需拆批；不讀取使用者伺服器檔案路徑。
 
 內部介面：`Importer(Operations(database), Phase1Settings()).attacks(raw: bytes, job_id: UUID|None) -> (http_status, result_dict)`；`Operations.get(job_id) -> job_dict|None`；所有資料及進度寫入皆經 `Repository` 與 `Database.transaction()`。
+
+
+### B1-2：多輪攻擊範本匯入
+
+`POST /api/v1/attack-templates/import`，Content-Type 為 `application/json`，無 query／path 參數；可選 `X-Job-ID`。body 可為原始單筆 `AttackTemplate`（上方資料契約範例），或 `[AttackTemplate, ...]` 陣列作批次封裝，不修改物件內欄位。成功 201 回傳與 B1-1 相同的 `job_id/status/elapsed_ms/imported/ids/duplicate_policy`；ids 為範本 UUID。例如 `{"job_id":"<UUID>","status":"succeeded","elapsed_ms":8,"imported":1,"ids":["<UUID>"],"duplicate_policy":"preserve"}`。
+
+輪次必須從 1 開始且連續、不能重複或顛倒，不限定三輪。任一項無效整批不保存；重複範本保留為新 UUID。錯誤狀態同 B1-1（409／413／415／422／503）；無效 JSON 使用 `invalid_json`，資料契約錯誤使用 `invalid_records`，details 的 record 表示陣列第幾筆（單筆為 1），path 例如 `["rounds"]`。`kind=template_import` 的進度及失敗可由共用 GET 操作介面查詢。不呼叫模型或外部 API。
+
+內部介面：`Importer.templates(raw: bytes, job_id: UUID|None) -> (http_status, result_dict)`；`Repository.add_templates(list[AttackTemplate]) -> list[UUID]` 為 C-1 的參數化批次保存擴充，沿用現有 attack_templates 表，不新增 migration。body／筆數限制及交易、重複操作政策與 B1-1 相同。

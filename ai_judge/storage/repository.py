@@ -89,16 +89,24 @@ class Repository:
         return None if row is None else dict(row)
 
     def add_template(self, data: AttackTemplate) -> UUID:
-        data = AttackTemplate.model_validate(data.model_dump())
-        record_id = uuid4()
-        self.connection.execute(
-            attack_templates.insert().values(
-                id=record_id,
-                risk_subcategory=data.risk_subcategory,
-                payload=data.model_dump(),
+        return self.add_templates([data])[0]
+
+    def add_templates(self, data: list[AttackTemplate]) -> list[UUID]:
+        validated = [AttackTemplate.model_validate(item.model_dump()) for item in data]
+        ids = [uuid4() for _ in validated]
+        if validated:
+            self.connection.execute(
+                attack_templates.insert(),
+                [
+                    {
+                        "id": record_id,
+                        "risk_subcategory": item.risk_subcategory,
+                        "payload": item.model_dump(),
+                    }
+                    for record_id, item in zip(ids, validated, strict=True)
+                ],
             )
-        )
-        return record_id
+        return ids
 
     def add_attacks(
         self,

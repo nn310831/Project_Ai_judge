@@ -1,6 +1,6 @@
 # AI Judge 後端
 
-依據 [實作計畫](CODEX_IMPLEMENTATION_PLAN.md) 分區塊交付。共同區塊 C-1 已完成；區塊 1 正在逐模組交付（下方列出已完成 API）。區塊 2～4 尚未實作，沒有前端。
+依據 [實作計畫](CODEX_IMPLEMENTATION_PLAN.md) 分區塊交付。共同區塊 C-1 已完成；區塊 1 的四個模組已實作（下方列出 API）。區塊 2～4 尚未實作，沒有前端。
 
 ## 安裝與啟動
 
@@ -131,7 +131,7 @@ GitHub Actions 在功能分支 push 及 PR 執行 lint、格式檢查與完整 P
 
 `.env`、私有設定 `config/local/`、`secrets/`、`data/`、`artifacts/`、日誌、權重與 `.venv/` 已忽略。真實資料與憑證應置於上述路徑或環境變數；每次提交仍需人工檢查，不能僅依賴副檔名規則。
 
-尚未完成：B1-4、B2-1～B2-7、B3A-1～B3A-5、B3B、B4-1～B4-8；研究規則待確認項目維持原計畫第 4.4 節。本次依賴的 Starlette 對 httpx TestClient 發出棄用警告，測試仍可執行，後續依相容版本更新。
+尚未完成：B2-1～B2-7、B3A-1～B3A-5、B3B、B4-1～B4-8；研究規則待確認項目維持原計畫第 4.4 節。本次依賴的 Starlette 對 httpx TestClient 發出棄用警告，測試仍可執行，後續依相容版本更新。
 
 
 ## 區塊 1：已完成 API
@@ -198,3 +198,31 @@ curl -X POST http://127.0.0.1:8000/api/v1/attacks/import \
 adapter 使用共享 httpx client，不跟隨 HTTP redirect、不讀代理環境變數；端點只能從受信任本機設定提供，不能由 API request 指定。上線時請使用 HTTPS；API 本身供授權的內部／本機環境使用。供應商需支援 messages、temperature、JSON object response_format 及完整的 choices/message/finish_reason 回傳；參考 [Chat Completions 官方介面](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create)。不相容或截斷回應會明確失敗，不猜測內容。
 
 內部可替換介面：`Generator.generate(AttackTemplate) -> AttackData`、`Generator.metadata() -> dict`；`GenerationService(operations, generator).generate(GenerationRequest, job_id=None)`。單元測試使用 HTTP transport 替身及注入 Generator，不提供生產環境假資料 fallback。真實供應商、模型及提示版本仍待專案設定確認；本次未進行付費 API 呼叫。`ORDER BY random()` 對極大量範本有掃描成本，受 DB statement timeout 保護。
+
+
+### B1-4：固定數量 K-DPP 多樣性抽樣
+
+`POST /api/v1/attacks/sample`，Content-Type `application/json`，無 query／path 參數，可選 `X-Job-ID`。body：`{"k":2,"subcategory":"synthetic","seed":42}`。k 為 1～500 的整數（不接受 bool）；subcategory 可省略／null 表示所有類別；seed 為 0～2^63−1 的整數，可省略，由系統生成並記錄。相同資料庫候選快照、設定、seed 與數值運算環境下可重現。
+
+成功 201：`{"job_id":"<UUID>","status":"succeeded","elapsed_ms":15,"samples":[{"id":"<attack UUID>","data":{"subcategory":"synthetic","attack_content":["合成文字"]}}],"sampling":{...}}`，samples 實際恰好 k 筆且 UUID 唯一，每筆 data 維持原始兩欄。`sampling` 包含完整設定、seed、`algorithm=spectral-k-dpp-v1`、`rng=PCG64`、NumPy 版本、表示法／正規化／hash、k、類別篩選、依序排列的所有 candidate_ids、候選 payload 的 SHA256；保存於 `kind=sampling` 的 job result，供區塊 2 載入及重現。上述例子只示意單筆元素形狀。
+
+錯誤：422 `insufficient_candidates`／`candidate_limit_exceeded`／`candidate_text_too_long`／`empty_representation`／`invalid_representation`／`invalid_kernel`／`non_symmetric_kernel`／`non_psd_kernel`／`insufficient_kernel_rank`／`kernel_eigendecomposition_failed`／`unstable_eigenvector_selection`／`unstable_projection`；429 `sampling_busy`；409 重複 job ID；503 儲存失敗。請求欄位非法回傳 FastAPI 422。錯誤使用共用 job/error/details 結構，核矩陣或表示法失敗 details 保存抽樣設定及候選快照，不回退成普通隨機抽樣。此 API 不呼叫外部 API 或模型／mock。
+
+候選由 PostgreSQL 依 `created_at, id` 排序讀取；超過上限會拒絕，請先用類別縮小範圍，不偷偷只選前 N 筆。輸入表示為每筆 attack_content 依序以換行連接，不將類別名稱加入文字。預設對 NFKC／casefold 文字做固定 blake2b 雜湊、有正負號的字元 n-gram 計數及 L2 正規化；這是可替換的文字特徵，不是已訓練的語意 embedding，可能有雜湊碰撞，並非已確認的最佳研究方法。
+
+kernel 可選 `linear: S=XXᵀ` 或 `rbf: Sᵢⱼ=exp(-gamma*||xᵢ-xⱼ||²)`；`Lᵢⱼ=qᵢ Sᵢⱼ qⱼ`，品質權重 q 由類別設定，未設定為 1，0 表示無抽中權重。依 [Kulesza 與 Taskar 的 k-DPP 方法](https://www.alexkulesza.com/pubs/dpps_fnt12.pdf) 以特徵分解、log 空間 elementary symmetric polynomial、條件特徵向量選擇與投影 DPP 抽樣，固定大小集合機率正比於 `det(L_Y)`。這不是 greedy 最大化或一般隨機抽樣。
+
+數值限制：核先做等比例縮放，對稱性／PSD／rank 均檢查；相對 eigen_tolerance 以下的特徵值視為數值零。因此是浮點精度下的 spectral k-DPP，不宣稱無誤差的實數運算。沒有自動加 jitter，重複／線性相依資料可能造成 rank < k 而失敗。6000 個固定 seed 的小矩陣測試比較實際頻率與各子集行列式理論機率；另驗證完全相同候選不會同時抽中。
+
+| `AI_JUDGE_SAMPLING_` 設定後綴 | 預設／範圍 |
+|---|---|
+| `REPRESENTATION` | hashed_char_ngram_v1；其他 encoder 可透過 Python 介面注入 |
+| `DIMENSIONS`／`NGRAM` | 256（16～4096）／3（1～5） |
+| `KERNEL`／`GAMMA` | rbf（或 linear）／1.0（>0 且 ≤100） |
+| `QUALITY_BY_SUBCATEGORY` | JSON object `{}`，如 `{"synthetic":1.2}`，有限數值 0～1000 |
+| `EIGEN_TOLERANCE` | 1e-10（1e-14～1e-4） |
+| `MAX_CANDIDATES` | 500（最多 500）；稠密特徵分解 O(N³)、記憶體 O(N²) |
+| `MAX_TEXT_CHARACTERS` | 10000（最多 100000）；超長拒絕，不截斷 |
+| `MAX_CONCURRENCY` | 1（最多 4），每程序計算併行上限 |
+
+內部介面：`sample_k_dpp(kernel, k, seed, tolerance) -> list[int]`；`SamplingService(operations, settings, encoder=None).sample(SamplingRequest, job_id=None)`；可替換 `Encoder.encode(list[str]) -> ndarray` 與 `metadata() -> dict`。結果與設定保存於既有 attack_jobs，不新增資料庫 migration。計算在同步路由的執行緒池中，操作進度為 0/k（計算中）或 k/k（完成），不提供誤導性的逐樣本假進度。固定 seed 不保證跨 BLAS／平台或 NumPy 版本產生完全相同索引。

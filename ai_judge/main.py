@@ -8,7 +8,9 @@ from sqlalchemy import text
 
 from ai_judge.config import Settings
 from ai_judge.phase1.generation import ChatCompletionsGenerator, GenAISettings, Generator
+from ai_judge.phase1.operations import Operations
 from ai_judge.phase1.routes import router
+from ai_judge.phase1.sampling import SamplingService, SamplingSettings
 from ai_judge.phase1.settings import Phase1Settings
 from ai_judge.storage.database import Database, StorageError, create_database_engine
 from ai_judge.storage.tables import SCHEMA_REVISION
@@ -24,6 +26,7 @@ def create_app(
     phase1_settings: Phase1Settings | None = None,
     generator: Generator | None = None,
     genai_settings: GenAISettings | None = None,
+    sampling_settings: SamplingSettings | None = None,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -34,6 +37,10 @@ def create_app(
             follow_redirects=False, trust_env=False, timeout=settings.timeout_seconds
         )
         app.state.generator = generator or ChatCompletionsGenerator(settings, client)
+        app.state.sampler = SamplingService(
+            Operations(app.state.database),
+            sampling_settings or SamplingSettings(),
+        )
         try:
             yield
         finally:

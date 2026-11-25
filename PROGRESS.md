@@ -16,8 +16,8 @@
 | 共同區塊 1／C-1 | 已完成，37 項測試通過；已 Commit／Push／建立 PR #1 | 資料契約、連線池、批次持久化、來源關聯、交易回滾、Alembic 遷移、健康檢查 |
 | 區塊 1／B1-1 | 已完成，已 Commit／Push：6754b4f | JSONL 匯入、原子保存、操作及錯誤查詢 |
 | 區塊 1／B1-2 | 已完成，已 Commit／Push：20c43f5 | 單筆／批次範本匯入、輪次驗證 |
-| 區塊 1／B1-3 | 已完成單元測試，準備提交 | 隨機範本、可替換 GenAI、驗證及來源保存 |
-| 區塊 1／B1-4 | 未開始 | K-DPP 抽樣 |
+| 區塊 1／B1-3 | 已完成，已 Commit／Push：88bee72 | 隨機範本、可替換 GenAI、驗證及來源保存 |
+| 區塊 1／B1-4 | 已完成單元測試，準備提交 | 真正 spectral K-DPP、可設定表示法／kernel／品質／seed |
 | 區塊 2／B2-1、B2-2、B2-3、B2-4、B2-5、B2-6、B2-7 | 未開始 | 依計畫相依關係實作 |
 | 區塊 3 Path A／B3A-1、B3A-2、B3A-3、B3A-4、B3A-5 | 未開始 | 真實介面與預設停用 mock 待實作 |
 | 區塊 3 Path B／B3B | 未開始 | 可替換的 mock AffordRanker 待實作 |
@@ -69,3 +69,8 @@
 - B1-2 功能 Commit：`20c43f5`，已立即 Push。
 - B1-3：完成可設定的 Chat Completions 正式 adapter、指定類別隨機範本、結果驗證及關聯保存；請求 timeout、回應大小／並行上限、單次呼叫無自動重試、錯誤記錄及憑證遮蔽。預設停用，未呼叫真實付費模型。
 - B1-3：`.venv/bin/python -m pytest tests/unit -q`，77 passed；lint 通過。新增 17 項生成與供應商替身測試。README／.env.example 更新。提交訊息 `feat(phase1): implement template-based GenAI generation`。
+
+- B1-3 功能 Commit：`88bee72`，已立即 Push。
+- B1-4：實作 spectral K-DPP、log elementary symmetric polynomials、projection sampling；可設定 hash n-gram 表示、linear／RBF、類別品質、seed 及上限，完整參數／候選快照保存。無普通隨機 fallback；數值秩不足明確失敗。
+- B1-4：`.venv/bin/python -m pytest tests/unit -q`，96 passed；lint 通過。新增 19 項抽樣測試，包括 6000 次固定 seed 的行列式分布檢驗、唯一性、重現性、候選／rank 不足、無效矩陣、品質權重及替換 encoder。
+- 新增 NumPy 依賴並更新 requirements-dev.lock；README／.env.example 同步。提交訊息 `feat(phase1): implement reproducible k-DPP sampling`。接著只執行區塊 1 整合驗證及 PR 交付。

@@ -8,6 +8,7 @@ from starlette.concurrency import run_in_threadpool
 from ai_judge.phase1.generation import GenerationRequest, GenerationService
 from ai_judge.phase1.importers import Importer
 from ai_judge.phase1.operations import Operations
+from ai_judge.phase1.sampling import SamplingRequest
 from ai_judge.storage.database import StorageError
 
 router = APIRouter(prefix="/api/v1", tags=["Block 1"])
@@ -83,4 +84,14 @@ def generate_attack(
 ):
     service = GenerationService(Operations(request.app.state.database), request.app.state.generator)
     status, result = service.generate(body, x_job_id)
+    return JSONResponse(status_code=status, content=result)
+
+
+@router.post("/attacks/sample", status_code=201)
+def sample_attacks(
+    body: SamplingRequest,
+    request: Request,
+    x_job_id: UUID | None = Header(default=None),
+):
+    status, result = request.app.state.sampler.sample(body, x_job_id)
     return JSONResponse(status_code=status, content=result)

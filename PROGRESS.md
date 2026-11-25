@@ -1,76 +1,77 @@
 # 開發進度
 
-更新日期：2026-11-25（Asia/Taipei）。本次範圍為「區塊 1」，每個模組測試後立即 Commit／Push，區塊完成後停止。
+更新日期：2026-11-25（Asia/Taipei）。本次「區塊 1」完成；四個模組均獨立測試、Commit、Push，區塊整合通過並建立 PR #2。停止於區塊 1，等待使用者指示區塊 2。
 
-## Repository 基準
+## Repository 與分支
 
-- Remote：`https://github.com/nn310831/Project_Ai_judge.git`，沿用既有 Repository。
-- 初始 `main`／遠端 `main`：`245ef663eb8a08078616123c3e088a52d9bd603a`（初次上傳）。開始時工作目錄乾淨，遠端只有 main，已用 `git ls-remote --heads origin` 確認。
-- 原先只有 `.gitignore` 受追蹤；實作計畫被忽略。本次保留計畫原文並納入版本控制。
-- 建立 `develop` 於上述基準；本次工作分支：`feature/common-storage`，PR 目標 `develop`。不合併或直接更新 main。
+- 沿用 `https://github.com/nn310831/Project_Ai_judge.git`；未新建 Repository、變更 Remote、重寫歷史或合併 main。
+- 本次開始前確認 status、remote、branch、log 及 ls-remote：main／develop 仍為 `245ef663eb8a08078616123c3e088a52d9bd603a`，C-1 為 `cf3b19d`，無遠端衝突。
+- 現在分支 `feature/phase1-attacks`，從已測試的 C-1 延伸；[PR #2](https://github.com/nn310831/Project_Ai_judge/pull/2) 目標 develop，依賴尚待整合的 [PR #1](https://github.com/nn310831/Project_Ai_judge/pull/1)。兩個 PR 均未由本次工作合併。
+- 使用者未提交的 `.gitignore` 修改（忽略 compose.dev.yaml）原樣保留，不納入 Commit；未讀取或操作開發資料庫。
 
-## 模組狀態
+## 模組與 Commit
 
-| 區塊／模組 | 狀態 | 交付 |
+| 區塊／模組 | 狀態 | Commit／交付 |
 |---|---|---|
-| 共同區塊 1／C-1 | 已完成，37 項測試通過；已 Commit／Push／建立 PR #1 | 資料契約、連線池、批次持久化、來源關聯、交易回滾、Alembic 遷移、健康檢查 |
-| 區塊 1／B1-1 | 已完成，已 Commit／Push：6754b4f | JSONL 匯入、原子保存、操作及錯誤查詢 |
-| 區塊 1／B1-2 | 已完成，已 Commit／Push：20c43f5 | 單筆／批次範本匯入、輪次驗證 |
-| 區塊 1／B1-3 | 已完成，已 Commit／Push：88bee72 | 隨機範本、可替換 GenAI、驗證及來源保存 |
-| 區塊 1／B1-4 | 已完成單元測試，準備提交 | 真正 spectral K-DPP、可設定表示法／kernel／品質／seed |
-| 區塊 2／B2-1、B2-2、B2-3、B2-4、B2-5、B2-6、B2-7 | 未開始 | 依計畫相依關係實作 |
-| 區塊 3 Path A／B3A-1、B3A-2、B3A-3、B3A-4、B3A-5 | 未開始 | 真實介面與預設停用 mock 待實作 |
-| 區塊 3 Path B／B3B | 未開始 | 可替換的 mock AffordRanker 待實作 |
-| 區塊 4／B4-1、B4-2、B4-3、B4-4、B4-5、B4-6、B4-7、B4-8 | 未開始 | 聯合判定、保存、指標及報告待實作 |
+| 共同區塊 1／C-1 | 完成、已 Push；PR #1 | `d2c6c9e` 儲存、`cf3b19d` 交付紀錄 |
+| 區塊 1／B1-1 | 完成、已獨立 Commit／Push | `6754b4f` JSONL 匯入、原子保存、逐行錯誤、操作查詢 |
+| 區塊 1／B1-2 | 完成、已獨立 Commit／Push | `20c43f5` 單筆／批次範本匯入、輪次驗證 |
+| 區塊 1／B1-3 | 完成、已獨立 Commit／Push | `88bee72` 隨機範本、可替換 GenAI、驗證及來源保存 |
+| 區塊 1／B1-4 | 完成、已獨立 Commit／Push | `88f1c80` spectral K-DPP、可設定表示法／kernel／品質／seed |
+| 區塊 1 整合 | 完成、已 Commit／Push | `5ca7a2e` PostgreSQL 流程與 OpenAPI schema 驗證 |
+| 區塊 2／B2-1、B2-2、B2-3、B2-4、B2-5、B2-6、B2-7 | 未開始 | 等待指示 |
+| 區塊 3 Path A／B3A-1、B3A-2、B3A-3、B3A-4、B3A-5 | 未開始 | 等待指示 |
+| 區塊 3 Path B／B3B | 未開始 | 等待指示 |
+| 區塊 4／B4-1、B4-2、B4-3、B4-4、B4-5、B4-6、B4-7、B4-8 | 未開始 | 等待指示 |
 
-## 驗證紀錄
+每個功能模組先測試並更新 README／進度、檢查暫存檔案及憑證模式，再建立 Conventional Commit 並立即 Push，才開始下一模組。Hash 在後續文件補記，未使用 amend／force push。
 
-- 初次單元測試：`python -m pytest tests/unit -q`，33 passed。
-- 初次 PostgreSQL 整合測試：沙盒阻擋本機 TCP 連線，2 setup errors；取得執行權限後重跑，2 passed。測試使用專屬 Docker PostgreSQL 17，不使用正式資料庫。
-- 已驗證：JSONB 持久化、重建實體連線後讀取、來源外鍵、交易錯誤回滾、重複執行 upgrade、schema 與 migration 一致、downgrade／upgrade、實際 health ready 狀態。
-- 最終完整測試：`AI_JUDGE_TEST_DATABASE_URL=postgresql+psycopg://postgres@127.0.0.1:55432/ai_judge_test .venv/bin/python -m pytest -q`，37 passed（34 單元、3 PostgreSQL 整合）、0 failed、0 skipped，1 個已知依賴棄用警告。已含設定錯誤遮蔽、SQL timeout 恢復案例。
-- `.venv/bin/ruff check ai_judge migrations tests`、`.venv/bin/ruff format --check ai_judge migrations tests`、`git diff --check` 均通過。
-- GitHub Actions 的功能 Commit Push 檢查已通過：[common-storage](https://github.com/nn310831/Project_Ai_judge/actions/runs/45440915602/job/138611442852)。後續文件 Commit 及 PR 檢查以 GitHub 顯示的最新結果為準。
-- 本次測試容器及專用網路已透過 `docker compose -p ai-judge-c1-test -f compose.test.yaml down` 清除。
-- 真實模型 API：未實作／未呼叫；模型 mock：未實作／未啟用。全專案端到端流程尚未執行。
+## 測試紀錄
 
-## Commit 與遠端追蹤
+| 階段 | 實際結果 |
+|---|---|
+| C-1 前次交付 | 37 passed（34 單元、3 PostgreSQL），遠端 CI 通過 |
+| B1-1 | `.venv/bin/python -m pytest tests/unit -q`：45 passed；含 PostgreSQL 全套 48 passed |
+| B1-2 | 同上單元測試：60 passed，新增 15 項範本案例 |
+| B1-3 | 同上單元測試：77 passed，新增 17 項生成／供應商替身案例 |
+| B1-4 | 同上單元測試：96 passed，新增 19 項抽樣案例 |
+| 區塊 1 最終整合 | 104 passed（97 單元、7 PostgreSQL），0 failed、0 skipped |
 
-- 基準 Commit：`245ef663eb8a08078616123c3e088a52d9bd603a`。
-- C-1 功能 Commit：`d2c6c9e32f160b1787d9556efbc62bc8825a50ab`，`feat(common): implement PostgreSQL storage module`；測試通過後已立即 Push 至 `origin/feature/common-storage`。
-- `develop` 已 Push 至 `origin/develop`，仍為初始穩定基準 `245ef66`，等待 PR 檢閱後整合。
-- [PR #1](https://github.com/nn310831/Project_Ai_judge/pull/1)：`feature/common-storage → develop`，已建立且未合併；`main` 維持原基準。
-- 此紀錄以後續 `docs(progress): record C-1 delivery and pull request` Commit 補記功能 Hash 與實際遠端結果；文件 Commit 本身 Hash 可由 `git log` 查閱，不改寫既有歷史。
-- 所有提交檔案已檢閱，憑證模式掃描通過；未提交本機環境、憑證、真實資料或模型權重。
+最終測試指令：
 
-## 已知限制與待處理
+```sh
+AI_JUDGE_TEST_DATABASE_URL=postgresql+psycopg://postgres@127.0.0.1:55432/ai_judge_test .venv/bin/python -m pytest -q
+.venv/bin/ruff check ai_judge migrations tests
+.venv/bin/ruff format --check ai_judge migrations tests
+git diff --check
+```
 
-- 目前只提供 C-1 內部儲存及健康檢查，資料匯入 HTTP API 屬下一區塊。
-- `attack_content` 採非空字串陣列；範本輪次由 1 連續遞增。README 明列此介面選擇，若實際資料採逐輪物件需確認後擴充。
-- 一般儲存不去重；匯入政策及原計畫 4.4 的研究決策仍待各區塊確認。
-- Starlette TestClient 對 httpx 有棄用警告，不影響本次結果。
-- 環境沒有 GitHub CLI，已透過既有 Git credential 與 GitHub API 建立 PR，未輸出或寫入憑證。
-- 本區塊已交付；停止於 C-1，待使用者指示再開始區塊 1。
+以上皆通過。1 項既有 Starlette/httpx TestClient 棄用警告，無未處理失敗。資料庫測試僅使用專屬 Docker PostgreSQL 17、隨機隔離 schema、合成資料。
 
+- 真實 PostgreSQL 驗證四模組流程、失敗批次不寫入、升級保留 C-1 資料、執行中進度與健康查詢、重複 ID 防護、重新建立連線後保存，以及 C-1 遷移／回滾／timeout 回歸。
+- K-DPP 使用 6000 個固定 seed 比較子集頻率與行列式理論機率；另測完全相同候選排斥、唯一性、重現性、候選／rank 不足及數值檢查。
+- GenAI 正式 adapter 已實作、預設停用；HTTP transport 替身驗證供應商 protocol，未進行真實付費呼叫，沒有生產 mock fallback。
+- 區塊 2～4 及全專案端到端測試未執行。
 
-## 區塊 1 開發紀錄
+## 介面及資料變更
 
-- 開始前已確認 status、remote、branch、log 及 ls-remote；遠端 main／develop 仍為 245ef66，C-1 功能分支 cf3b19d。從已驗證的 C-1 建立 `feature/phase1-attacks`，PR 將以 develop 為目標並註明依賴 PR #1。
-- 使用者未提交的 `.gitignore` 修改（忽略 compose.dev.yaml）原樣保留，不納入本次 Commit；不讀取或操作其開發資料庫。
-- B1-1：新增 JSONL 匯入、strict JSON／資料契約驗證、原子批次保存、可查詢操作紀錄與錯誤；migration 0002_phase1_jobs。README 已列完整 API／限制。
-- B1-1 單元測試：`.venv/bin/python -m pytest tests/unit -q`，45 passed；lint 通過。提交訊息 `feat(phase1): implement JSONL dataset importer`；Hash 在下一模組紀錄補記，不改寫歷史。
+- POST `/api/v1/attacks/import`、`/api/v1/attack-templates/import`、`/api/v1/attacks/generate`、`/api/v1/attacks/sample`；GET `/api/v1/attack-jobs/{job_id}`。OpenAPI／README 列成功及錯誤 schema、設定、範例與限制。
+- 新增 `0002_phase1_jobs` 遷移與 attack_jobs；保留原始攻擊／範本欄位。成功資料與成功 job 狀態原子提交。
+- 新增 AI_JUDGE_PHASE1_*、AI_JUDGE_GENAI_*、AI_JUDGE_SAMPLING_* 設定，.env.example 不含真實憑證。
+- 新增 NumPy，httpx 列為正式依賴，requirements-dev.lock 同步。
 
-- B1-1 全套測試（含隔離 PostgreSQL）：48 passed、0 failed、0 skipped；遷移與既有功能回歸通過，1 項已知 TestClient 棄用警告。
+## 限制與待確認
 
-- B1-1 功能 Commit：`6754b4f`，已立即 Push 至 origin/feature/phase1-attacks。
-- B1-2：單筆或陣列封裝範本匯入；驗證輪次順序／型態，整批保存或回滾，保留重複資料。README 與測試同步更新。
-- B1-2：`.venv/bin/python -m pytest tests/unit -q`，60 passed，lint 通過；新增 15 個範本匯入案例。提交訊息 `feat(phase1): implement attack template importer`，Hash 於下一模組補記。
+- 真實 GenAI 供應商、模型及提示版本仍需專案設定；只交付 Chat Completions 相容 adapter，不宣稱驗證真實模型品質。
+- hash char n-gram 文字表示可替換；kernel／品質設定為工程起點，不代表已確認研究方法。候選最多 500，超限拒絕，不截取前 N 筆或退回普通隨機抽樣。
+- 浮點 k-DPP 按 tolerance 將微小特徵值視為零；不自動加 jitter。跨平台／BLAS／NumPy 版本不保證索引完全相同。
+- 匯入保留重複內容，失敗整批不寫入。攻擊仍用非空文字陣列；範本 round 從 1 連續遞增。
+- 有上限的同步請求由執行緒池執行，可預先指定 X-Job-ID 查進度。中斷操作在 10 分鐘期限後被查詢時標示 interrupted；無自動重試、重複付費或背景佇列。
+- 原計畫 4.4 其餘研究規則保留待確認；未提前實作區塊 2～4。
 
-- B1-2 功能 Commit：`20c43f5`，已立即 Push。
-- B1-3：完成可設定的 Chat Completions 正式 adapter、指定類別隨機範本、結果驗證及關聯保存；請求 timeout、回應大小／並行上限、單次呼叫無自動重試、錯誤記錄及憑證遮蔽。預設停用，未呼叫真實付費模型。
-- B1-3：`.venv/bin/python -m pytest tests/unit -q`，77 passed；lint 通過。新增 17 項生成與供應商替身測試。README／.env.example 更新。提交訊息 `feat(phase1): implement template-based GenAI generation`。
+## 交付追蹤
 
-- B1-3 功能 Commit：`88bee72`，已立即 Push。
-- B1-4：實作 spectral K-DPP、log elementary symmetric polynomials、projection sampling；可設定 hash n-gram 表示、linear／RBF、類別品質、seed 及上限，完整參數／候選快照保存。無普通隨機 fallback；數值秩不足明確失敗。
-- B1-4：`.venv/bin/python -m pytest tests/unit -q`，96 passed；lint 通過。新增 19 項抽樣測試，包括 6000 次固定 seed 的行列式分布檢驗、唯一性、重現性、候選／rank 不足、無效矩陣、品質權重及替換 encoder。
-- 新增 NumPy 依賴並更新 requirements-dev.lock；README／.env.example 同步。提交訊息 `feat(phase1): implement reproducible k-DPP sampling`。接著只執行區塊 1 整合驗證及 PR 交付。
+[PR #2](https://github.com/nn310831/Project_Ai_judge/pull/2) 已建立且未合併。功能與整合 Commit 已同步遠端；本文件以後續文件 Commit 補記實際交付，該 Commit Hash 由 git log 查閱。最新 GitHub Actions 以 PR checks 顯示為準。
+
+- 整合 Commit `5ca7a2e` 的 [Push 檢查](https://github.com/nn310831/Project_Ai_judge/actions/runs/45641803953/job/139302149881) 與 [PR 檢查](https://github.com/nn310831/Project_Ai_judge/actions/runs/45641946500/job/139302666451) 均已確認 success。
+- 本次測試容器與專用網路已以 `docker compose -p ai-judge-c1-test -f compose.test.yaml down` 移除。

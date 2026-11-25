@@ -27,7 +27,7 @@ uvicorn ai_judge.main:app --host 127.0.0.1 --port 8000
 | `AI_JUDGE_DB_CONNECT_TIMEOUT` | 5 秒，建立連線上限 |
 | `AI_JUDGE_DB_STATEMENT_TIMEOUT_MS` | 10000 毫秒，SQL 執行上限 |
 
-本區塊不呼叫 GenAI 或其他模型，沒有正式模型或 mock 開關。SQLite 僅用於單元測試替身；正式環境只接受 PostgreSQL。區塊 2 mock 預設停用、Path A mock 預設停用、Path B mock 預設啟用的要求，留待各區塊實作。
+C-1 不呼叫模型；B1-3 提供正式 GenAI adapter，但預設停用，設定方式見下方。SQLite 僅用於單元測試替身；正式環境只接受 PostgreSQL。區塊 2 mock 預設停用、Path A mock 預設停用、Path B mock 預設啟用的要求，留待各區塊實作。
 
 ## 已完成 HTTP API（C-1）
 
@@ -65,7 +65,7 @@ uvicorn ai_judge.main:app --host 127.0.0.1 --port 8000
 
 ## C-1 內部儲存 API
 
-資料讀寫目前為 Python 內部介面，尚無對外資料匯入 HTTP endpoint；未來 B1-1、B1-2、B1-3 及 B2-7 等使用此層。所有 Repository 方法須在同一 `Database.transaction()` 中呼叫：成功離開提交，任意例外離開回滾。勿在交易內吞掉寫入錯誤後繼續使用交易。
+資料讀寫由 Python 共用介面提供，B1-1～B1-4 的 HTTP API 皆使用此層；B2-7 等後續模組仍待實作。所有 Repository 方法須在同一 `Database.transaction()` 中呼叫：成功離開提交，任意例外離開回滾。勿在交易內吞掉寫入錯誤後繼續使用交易。
 
 ```python
 from ai_judge.config import Settings
@@ -108,10 +108,11 @@ finally:
 | `attack_templates` | UUID 主鍵 `id`、`risk_subcategory` 類別索引、原始 `payload JSONB`、`created_at TIMESTAMPTZ` |
 | `attacks` | UUID 主鍵 `id`、`subcategory` 類別索引、原始 `payload JSONB`、可空 `source_template_id` 外鍵及索引、`created_at TIMESTAMPTZ` |
 | `alembic_version` | Alembic 遷移版本 |
+| `attack_jobs` | UUID 主鍵、kind／status、processed／total、result JSONB、created_at／finished_at／expires_at |
 
 來源外鍵使用 `ON DELETE RESTRICT`，避免來源範本被刪除後失去關聯。契約驗證在共用儲存入口執行；直接 SQL 寫入不屬公開介面。後續評測、判定與紀錄資料表待所屬模組落實時以新 migration 加入，不預先猜測未確認研究規則。
 
-目前流程：資料契約驗證 → 交易 → Repository 批次保存／讀取 → PostgreSQL。後續依計畫為區塊 1 匯入／生成／K-DPP → 區塊 2 多輪測試 → 區塊 3 Path A/B → 區塊 4 統計及報告，本次未執行這些流程。
+已驗證流程：區塊 1 JSONL／範本匯入 → PostgreSQL → 指定類別隨機範本 → GenAI HTTP 測試替身 → 結果驗證保存 → K-DPP → 可追溯結果。區塊 2 多輪測試、區塊 3 Path A/B、區塊 4 統計及報告尚未實作或執行。
 
 ## 測試與開發
 
@@ -226,3 +227,14 @@ kernel 可選 `linear: S=XXᵀ` 或 `rbf: Sᵢⱼ=exp(-gamma*||xᵢ-xⱼ||²)`�
 | `MAX_CONCURRENCY` | 1（最多 4），每程序計算併行上限 |
 
 內部介面：`sample_k_dpp(kernel, k, seed, tolerance) -> list[int]`；`SamplingService(operations, settings, encoder=None).sample(SamplingRequest, job_id=None)`；可替換 `Encoder.encode(list[str]) -> ndarray` 與 `metadata() -> dict`。結果與設定保存於既有 attack_jobs，不新增資料庫 migration。計算在同步路由的執行緒池中，操作進度為 0/k（計算中）或 k/k（完成），不提供誤導性的逐樣本假進度。固定 seed 不保證跨 BLAS／平台或 NumPy 版本產生完全相同索引。
+
+
+## 區塊 1 驗收與範圍
+
+本機完整測試為 104 passed（97 單元、7 PostgreSQL 整合），涵蓋四模組流程、升級保留既有資料、整批失敗回滾、進度併行查詢、重複 ID 防護及重新連線後保存。OpenAPI 列出各成功回應與錯誤 schema。只有既有的 Starlette/httpx TestClient 棄用警告。
+
+真實付費 GenAI 未呼叫；HTTP protocol 以 transport 替身驗證，資料庫則為 PostgreSQL 17。未宣稱完成區塊 2～4 或全專案端到端驗收。操作紀錄尚無自動清理政策；對外部署存取控制、備份及分散式工作佇列不屬本次交付。後端維持本機 .venv，compose.test.yaml 僅提供測試 PostgreSQL。
+
+區塊 PR：[PR #2](https://github.com/nn310831/Project_Ai_judge/pull/2)，目標 develop，依賴共同區塊 PR #1，等待檢閱。
+
+共用儲存新增的內部介面還包括 `Repository.random_template(risk_subcategory) -> StoredTemplate|None`、`start_job(id, kind) -> bool`、`update_job_progress(id, processed, total)`、`finish_job(id, status, result)`、`get_job(id) -> dict|None`；均須在 C-1 交易內使用。start_job 以主鍵衝突安全插入，finish_job 只允許從 running 轉為終止狀態，避免重複完成或覆蓋結果。

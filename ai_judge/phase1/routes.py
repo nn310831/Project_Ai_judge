@@ -1,0 +1,53 @@
+from uuid import UUID
+
+from fastapi import APIRouter, Header, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
+
+from ai_judge.phase1.importers import Importer
+from ai_judge.phase1.operations import Operations
+from ai_judge.storage.database import StorageError
+
+router = APIRouter(prefix="/api/v1", tags=["Block 1"])
+
+
+async def read_body(request: Request, media_type: str) -> bytes | JSONResponse:
+    if request.headers.get("content-type", "").split(";")[0].strip() != media_type:
+        return JSONResponse(status_code=415, content={"error": "unsupported_media_type"})
+    raw = bytearray()
+    async for chunk in request.stream():
+        raw.extend(chunk)
+        if len(raw) > request.app.state.phase1_settings.max_body_bytes:
+            return JSONResponse(status_code=413, content={"error": "body_too_large"})
+    return bytes(raw)
+
+
+@router.post(
+    "/attacks/import",
+    status_code=201,
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {"application/x-ndjson": {"schema": {"type": "string"}}},
+        }
+    },
+)
+async def import_attacks(request: Request, x_job_id: UUID | None = Header(default=None)):
+    raw = await read_body(request, "application/x-ndjson")
+    if isinstance(raw, JSONResponse):
+        return raw
+    importer = Importer(Operations(request.app.state.database), request.app.state.phase1_settings)
+    status, result = await run_in_threadpool(importer.attacks, raw, x_job_id)
+    return JSONResponse(status_code=status, content=result)
+
+
+@router.get("/attack-jobs/{job_id}")
+def get_job(job_id: UUID, request: Request):
+    try:
+        job = Operations(request.app.state.database).get(job_id)
+    except StorageError:
+        return JSONResponse(status_code=503, content={"error": "storage_unavailable"})
+    if job is None:
+        return JSONResponse(status_code=404, content={"error": "job_not_found"})
+    return JSONResponse(content=jsonable_encoder(job))

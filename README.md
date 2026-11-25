@@ -1,6 +1,6 @@
 # AI Judge 後端
 
-依據 [實作計畫](CODEX_IMPLEMENTATION_PLAN.md) 分區塊交付。目前僅完成共同區塊模組 1（C-1）：共享資料契約、PostgreSQL 儲存、交易、遷移及健康檢查。區塊 1～4 尚未實作，沒有前端。
+依據 [實作計畫](CODEX_IMPLEMENTATION_PLAN.md) 分區塊交付。共同區塊 C-1 已完成；區塊 1 正在逐模組交付（下方列出已完成 API）。區塊 2～4 尚未實作，沒有前端。
 
 ## 安裝與啟動
 
@@ -36,7 +36,7 @@ uvicorn ai_judge.main:app --host 127.0.0.1 --port 8000
 | Method／完整 path | 用途 | 成功回應 schema／範例 | 錯誤 |
 |---|---|---|---|
 | `GET /health/live` | 程序存活，不查資料庫 | 200，`{"status":"ok"}` | 無自訂業務錯誤 |
-| `GET /health/ready` | 查詢資料庫是否可用且遷移版本為 `0001_common_storage` | 200，`{"status":"ready"}` | 503，`{"status":"unavailable"}`；連線／SQL 失敗、尚未遷移或版本不符 |
+| `GET /health/ready` | 查詢資料庫是否可用且遷移版本為 `0002_phase1_jobs` | 200，`{"status":"ready"}` | 503，`{"status":"unavailable"}`；連線／SQL 失敗、尚未遷移或版本不符 |
 | `GET /openapi.json` | FastAPI 產生的 API schema | 200，OpenAPI JSON 物件，包含 `paths`、`components` | 無自訂業務錯誤 |
 | `GET /docs`、`GET /redoc` | FastAPI 自動 API 文件 | 200，HTML | 無自訂業務錯誤 |
 
@@ -101,7 +101,7 @@ finally:
 
 ## 資料庫與流程
 
-遷移版本：`0001_common_storage`。
+遷移版本：`0002_phase1_jobs`。
 
 | Table | 欄位／索引 |
 |---|---|
@@ -131,4 +131,33 @@ GitHub Actions 在功能分支 push 及 PR 執行 lint、格式檢查與完整 P
 
 `.env`、私有設定 `config/local/`、`secrets/`、`data/`、`artifacts/`、日誌、權重與 `.venv/` 已忽略。真實資料與憑證應置於上述路徑或環境變數；每次提交仍需人工檢查，不能僅依賴副檔名規則。
 
-尚未完成：B1-1～B1-4、B2-1～B2-7、B3A-1～B3A-5、B3B、B4-1～B4-8；研究規則待確認項目維持原計畫第 4.4 節。本次依賴的 Starlette 對 httpx TestClient 發出棄用警告，測試仍可執行，後續依相容版本更新。
+尚未完成：B1-2～B1-4、B2-1～B2-7、B3A-1～B3A-5、B3B、B4-1～B4-8；研究規則待確認項目維持原計畫第 4.4 節。本次依賴的 Starlette 對 httpx TestClient 發出棄用警告，測試仍可執行，後續依相容版本更新。
+
+
+## 區塊 1：已完成 API
+
+### B1-1：實際多輪攻擊 JSONL 匯入
+
+`POST /api/v1/attacks/import`，Content-Type 為 `application/x-ndjson`，body 是 UTF-8 JSONL，每行保持原始 `AttackData` 物件，不包裝為 JSON 陣列。接受 UTF-8 BOM、CRLF 及檔尾換行；空白行視為錯誤。禁止重複 JSON key、NaN／Infinity、缺欄位、錯誤型別及未知欄位。整批驗證後以 C-1 在單一交易保存，任一行錯誤整批不寫入；重複內容保留。
+
+```sh
+curl -X POST http://127.0.0.1:8000/api/v1/attacks/import \
+  -H 'Content-Type: application/x-ndjson' \
+  --data-binary @data/synthetic.jsonl
+```
+
+成功 201 範例：`{"job_id":"<UUID>","status":"succeeded","elapsed_ms":12,"imported":2,"ids":["<UUID>","<UUID>"],"duplicate_policy":"preserve"}`。`ids` 對應輸入順序；`elapsed_ms` 為此次請求執行時間。
+
+錯誤 422 範例：`{"job_id":"<UUID>","status":"failed","elapsed_ms":3,"error":"invalid_records","details":[{"record":2,"path":["attack_content",0],"type":"string_type"}]}`。`record` 由 1 起算；詳細錯誤不回傳原始資料或 SQL。其他 422 錯誤為 `invalid_utf8`、`invalid_record_count`；過大 body 413 `body_too_large`、Content-Type 不符 415 `unsupported_media_type`、DB 錯誤 503 `storage_unavailable`。這個 API 不呼叫外部模型或 mock。
+
+### 共用操作進度與失敗查詢
+
+`GET /api/v1/attack-jobs/{job_id}`，path 為 UUID，無 body／query。成功 200 回傳 `id: UUID`、`kind: string`、`status: running|succeeded|failed|interrupted`、`processed: integer`、`total: integer|null`、`result: object|null`、`created_at`、`finished_at`、`expires_at`（ISO 8601 日期時間；未完成的 finished_at 為 null）。例如 `{"id":"<UUID>","kind":"attack_import","status":"succeeded","processed":2,"total":2,"result":{"imported":2,"ids":["<UUID>","<UUID>"],"duplicate_policy":"preserve"},"created_at":"...","finished_at":"...","expires_at":"..."}`。查無 404 `{"error":"job_not_found"}`；UUID 格式不合法 422 FastAPI validation detail；DB 失敗 503 `{"error":"storage_unavailable"}`。不呼叫外部 API／mock。
+
+呼叫 POST 可選用 `X-Job-ID: <client-generated UUID>`；同一 ID 再次請求回傳 409 `{"job_id":"<UUID>","error":"job_id_exists"}`，不重複執行。這讓呼叫者在 POST 尚未結束時用已知 ID 從另一連線查進度；未指定則由伺服器產生並在結果回傳。這是同步完成的 bounded request API，DB 與解析工作放在執行緒池，不阻塞其他 API。`processed` 是已驗證筆數，不代表已提交；每 100 筆及結尾更新。
+
+新增遷移 `0002_phase1_jobs` 及 `attack_jobs` 表，保存上述操作紀錄；成功資料及成功紀錄原子提交。程序中斷或 DB 全面故障時，running 任務在 10 分鐘期限後被查詢時標為 interrupted，不自動重跑。無背景工作佇列或自動復原重試；失敗需檢查紀錄後明確提交新 ID。
+
+設定：`AI_JUDGE_PHASE1_MAX_BODY_BYTES` 預設 2,000,000（最多 20,000,000）；`AI_JUDGE_PHASE1_MAX_IMPORT_RECORDS` 預設 1,000（最多 10,000）。目前適合受限批次，較大量資料需拆批；不讀取使用者伺服器檔案路徑。
+
+內部介面：`Importer(Operations(database), Phase1Settings()).attacks(raw: bytes, job_id: UUID|None) -> (http_status, result_dict)`；`Operations.get(job_id) -> job_dict|None`；所有資料及進度寫入皆經 `Repository` 與 `Database.transaction()`。

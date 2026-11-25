@@ -1,6 +1,6 @@
 # 開發進度
 
-更新日期：2026-11-25（Asia/Taipei）。本次範圍僅「共同區塊」，完成後等待使用者指示。
+更新日期：2026-11-25（Asia/Taipei）。本次範圍為「區塊 1」，每個模組測試後立即 Commit／Push，區塊完成後停止。
 
 ## Repository 基準
 
@@ -14,7 +14,8 @@
 | 區塊／模組 | 狀態 | 交付 |
 |---|---|---|
 | 共同區塊 1／C-1 | 已完成，37 項測試通過；已 Commit／Push／建立 PR #1 | 資料契約、連線池、批次持久化、來源關聯、交易回滾、Alembic 遷移、健康檢查 |
-| 區塊 1／B1-1、B1-2、B1-3、B1-4 | 未開始 | 等待使用者指定下一區塊 |
+| 區塊 1／B1-1 | 已完成單元測試，準備提交 | JSONL 匯入、原子保存、操作及錯誤查詢 |
+| 區塊 1／B1-2、B1-3、B1-4 | 未開始 | 按序實作 |
 | 區塊 2／B2-1、B2-2、B2-3、B2-4、B2-5、B2-6、B2-7 | 未開始 | 依計畫相依關係實作 |
 | 區塊 3 Path A／B3A-1、B3A-2、B3A-3、B3A-4、B3A-5 | 未開始 | 真實介面與預設停用 mock 待實作 |
 | 區塊 3 Path B／B3B | 未開始 | 可替換的 mock AffordRanker 待實作 |
@@ -48,3 +49,13 @@
 - Starlette TestClient 對 httpx 有棄用警告，不影響本次結果。
 - 環境沒有 GitHub CLI，已透過既有 Git credential 與 GitHub API 建立 PR，未輸出或寫入憑證。
 - 本區塊已交付；停止於 C-1，待使用者指示再開始區塊 1。
+
+
+## 區塊 1 開發紀錄
+
+- 開始前已確認 status、remote、branch、log 及 ls-remote；遠端 main／develop 仍為 245ef66，C-1 功能分支 cf3b19d。從已驗證的 C-1 建立 `feature/phase1-attacks`，PR 將以 develop 為目標並註明依賴 PR #1。
+- 使用者未提交的 `.gitignore` 修改（忽略 compose.dev.yaml）原樣保留，不納入本次 Commit；不讀取或操作其開發資料庫。
+- B1-1：新增 JSONL 匯入、strict JSON／資料契約驗證、原子批次保存、可查詢操作紀錄與錯誤；migration 0002_phase1_jobs。README 已列完整 API／限制。
+- B1-1 單元測試：`.venv/bin/python -m pytest tests/unit -q`，45 passed；lint 通過。提交訊息 `feat(phase1): implement JSONL dataset importer`；Hash 在下一模組紀錄補記，不改寫歷史。
+
+- B1-1 全套測試（含隔離 PostgreSQL）：48 passed、0 failed、0 skipped；遷移與既有功能回歸通過，1 項已知 TestClient 棄用警告。

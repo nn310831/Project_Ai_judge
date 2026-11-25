@@ -2,7 +2,27 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 
 metadata = sa.MetaData()
+SCHEMA_REVISION = "0002_phase1_jobs"
 json_type = sa.JSON().with_variant(JSONB(), "postgresql")
+
+attack_jobs = sa.Table(
+    "attack_jobs",
+    metadata,
+    sa.Column("id", sa.Uuid(), primary_key=True),
+    sa.Column("kind", sa.Text(), nullable=False),
+    sa.Column("status", sa.Text(), nullable=False),
+    sa.Column("processed", sa.Integer(), nullable=False, server_default="0"),
+    sa.Column("total", sa.Integer(), nullable=True),
+    sa.Column("result", json_type, nullable=True),
+    sa.Column(
+        "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+    ),
+    sa.Column("finished_at", sa.DateTime(timezone=True)),
+    sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
+    sa.CheckConstraint(
+        "status IN ('running', 'succeeded', 'failed', 'interrupted')", name="ck_attack_jobs_status"
+    ),
+)
 
 attack_templates = sa.Table(
     "attack_templates",

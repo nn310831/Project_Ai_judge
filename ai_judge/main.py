@@ -6,17 +6,23 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from ai_judge.config import Settings
+from ai_judge.phase1.routes import router
+from ai_judge.phase1.settings import Phase1Settings
 from ai_judge.storage.database import Database, StorageError, create_database_engine
+from ai_judge.storage.tables import SCHEMA_REVISION
 
 
 class Health(BaseModel):
     status: str
 
 
-def create_app(database: Database | None = None) -> FastAPI:
+def create_app(
+    database: Database | None = None, *, phase1_settings: Phase1Settings | None = None
+) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.database = database or Database(create_database_engine(Settings()))
+        app.state.phase1_settings = phase1_settings or Phase1Settings()
         try:
             yield
         finally:
@@ -24,6 +30,7 @@ def create_app(database: Database | None = None) -> FastAPI:
                 app.state.database.close()
 
     app = FastAPI(title="AI Judge", version="0.1.0", lifespan=lifespan)
+    app.include_router(router)
 
     @app.get("/health/live", response_model=Health, tags=["C-1"])
     def live():
@@ -43,7 +50,7 @@ def create_app(database: Database | None = None) -> FastAPI:
                 revision = connection.execute(
                     text("SELECT version_num FROM alembic_version")
                 ).scalar_one_or_none()
-                if revision != "0001_common_storage":
+                if revision != SCHEMA_REVISION:
                     return JSONResponse(status_code=503, content={"status": "unavailable"})
         except StorageError:
             return JSONResponse(status_code=503, content={"status": "unavailable"})

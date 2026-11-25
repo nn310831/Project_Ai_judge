@@ -1,12 +1,13 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import sqlalchemy as sa
 from sqlalchemy import Connection
 
 from ai_judge.contracts import AttackData, AttackTemplate
-from ai_judge.storage.tables import attack_templates, attacks
+from ai_judge.storage.database import StorageError
+from ai_judge.storage.tables import attack_jobs, attack_templates, attacks
 
 
 class ReferenceError(ValueError):
@@ -33,6 +34,59 @@ class Repository:
 
     def __init__(self, connection: Connection):
         self.connection = connection
+
+    def start_job(self, job_id: UUID, kind: str) -> bool:
+        # Conflict-safe insertion prevents a concurrent duplicate paid API call.
+        if self.connection.dialect.name == "postgresql":
+            from sqlalchemy.dialects.postgresql import insert
+        else:
+            from sqlalchemy.dialects.sqlite import insert
+        result = self.connection.execute(
+            insert(attack_jobs)
+            .values(
+                id=job_id,
+                kind=kind,
+                status="running",
+                expires_at=datetime.now(UTC) + timedelta(minutes=10),
+            )
+            .on_conflict_do_nothing(index_elements=["id"])
+            .returning(attack_jobs.c.id)
+        )
+        return result.scalar_one_or_none() is not None
+
+    def update_job_progress(self, job_id: UUID, processed: int, total: int):
+        self.connection.execute(
+            attack_jobs.update()
+            .where(
+                attack_jobs.c.id == job_id,
+                attack_jobs.c.status == "running",
+            )
+            .values(processed=processed, total=total)
+        )
+
+    def finish_job(self, job_id: UUID, status: str, result: dict):
+        changed = self.connection.execute(
+            attack_jobs.update()
+            .where(
+                attack_jobs.c.id == job_id,
+                attack_jobs.c.status == "running",
+            )
+            .values(status=status, result=result, finished_at=datetime.now(UTC))
+        )
+        if changed.rowcount != 1:
+            raise StorageError("Job is no longer running")
+
+    def get_job(self, job_id: UUID) -> dict | None:
+        row = (
+            self.connection.execute(
+                sa.select(attack_jobs).where(
+                    attack_jobs.c.id == job_id,
+                )
+            )
+            .mappings()
+            .first()
+        )
+        return None if row is None else dict(row)
 
     def add_template(self, data: AttackTemplate) -> UUID:
         data = AttackTemplate.model_validate(data.model_dump())

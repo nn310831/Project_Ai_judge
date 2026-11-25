@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from ai_judge.config import Settings
 from ai_judge.main import create_app
 from ai_judge.storage.database import create_database_engine
+from ai_judge.storage.tables import SCHEMA_REVISION
 
 
 def test_settings_redaction_and_pool():
@@ -43,10 +44,11 @@ def test_health_and_openapi(database):
         assert client.get("/health/ready").status_code == 503
         with database.transaction() as connection:
             connection.execute(
-                sa.text("UPDATE alembic_version SET version_num = '0001_common_storage'")
+                sa.text("UPDATE alembic_version SET version_num = :revision"),
+                {"revision": SCHEMA_REVISION},
             )
         assert client.get("/health/ready").json() == {"status": "ready"}
-        assert set(client.get("/openapi.json").json()["paths"]) == {
+        assert set(client.get("/openapi.json").json()["paths"]) >= {
             "/health/live",
             "/health/ready",
         }

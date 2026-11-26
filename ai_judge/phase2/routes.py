@@ -26,8 +26,32 @@ def authorize(request: Request, credential: HTTPAuthorizationCredentials | None 
         raise TargetError("unauthorized", 401)
 
 
+class TargetErrorResponse(BaseModel):
+    error: str
+
+
+class TargetValidationResponse(BaseModel):
+    detail: list[dict]
+
+
 router = APIRouter(
-    prefix="/api/v1/target-models", tags=["Block 2"], dependencies=[Depends(authorize)]
+    prefix="/api/v1/target-models",
+    tags=["Block 2"],
+    dependencies=[Depends(authorize)],
+    responses={
+        401: {"model": TargetErrorResponse, "description": "Missing or invalid bearer token"},
+        403: {"model": TargetErrorResponse, "description": "Endpoint or mock mode not allowed"},
+        404: {"model": TargetErrorResponse, "description": "Referenced record not found"},
+        409: {"model": TargetErrorResponse, "description": "Run ID already exists"},
+        422: {
+            "model": TargetErrorResponse | TargetValidationResponse,
+            "description": "Invalid request, sampling snapshot, or effective parameters",
+        },
+        503: {
+            "model": TargetErrorResponse,
+            "description": "Storage or API configuration unavailable",
+        },
+    },
 )
 
 

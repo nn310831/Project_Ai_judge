@@ -1,12 +1,12 @@
 # 開發進度
 
-更新日期：2026-11-25（Asia/Taipei）。本次「區塊 1」完成；四個模組均獨立測試、Commit、Push，區塊整合通過並建立 PR #2。停止於區塊 1，等待使用者指示區塊 2。
+更新日期：2026-11-26（Asia/Taipei）。區塊 2 七個模組均已獨立測試、Commit、Push；165 項完整測試通過，正在完成 PR 交付。完成後停止於區塊 2，等待使用者指示下一區塊。
 
 ## Repository 與分支
 
 - 沿用 `https://github.com/nn310831/Project_Ai_judge.git`；未新建 Repository、變更 Remote、重寫歷史或合併 main。
 - 本次開始前確認 status、remote、branch、log 及 ls-remote：main／develop 仍為 `245ef663eb8a08078616123c3e088a52d9bd603a`，C-1 為 `cf3b19d`，無遠端衝突。
-- 現在分支 `feature/phase1-attacks`，從已測試的 C-1 延伸；[PR #2](https://github.com/nn310831/Project_Ai_judge/pull/2) 目標 develop，依賴尚待整合的 [PR #1](https://github.com/nn310831/Project_Ai_judge/pull/1)。兩個 PR 均未由本次工作合併。
+- 前次區塊 1 分支 `feature/phase1-attacks`，從已測試的 C-1 延伸；[PR #2](https://github.com/nn310831/Project_Ai_judge/pull/2) 目標 develop，依賴尚待整合的 [PR #1](https://github.com/nn310831/Project_Ai_judge/pull/1)。兩個 PR 均未由本次工作合併。
 - 使用者未提交的 `.gitignore` 修改（忽略 compose.dev.yaml）原樣保留，不納入 Commit；未讀取或操作開發資料庫。
 
 ## 模組與 Commit
@@ -19,14 +19,20 @@
 | 區塊 1／B1-3 | 完成、已獨立 Commit／Push | `88bee72` 隨機範本、可替換 GenAI、驗證及來源保存 |
 | 區塊 1／B1-4 | 完成、已獨立 Commit／Push | `88f1c80` spectral K-DPP、可設定表示法／kernel／品質／seed |
 | 區塊 1 整合 | 完成、已 Commit／Push | `5ca7a2e` PostgreSQL 流程與 OpenAPI schema 驗證 |
-| 區塊 2／B2-1、B2-2、B2-3、B2-4、B2-5、B2-6、B2-7 | 未開始 | 等待指示 |
+| 區塊 2／B2-1 | 完成、已 Commit／Push | `e873f36` 設定 |
+| 區塊 2／B2-2 | 完成、已 Commit／Push | `26f45f8` 載入與 adapter |
+| 區塊 2／B2-3 | 完成、已 Commit／Push | `56b1125` 多輪 runner／worker |
+| 區塊 2／B2-4 | 完成、已 Commit／Push | `caeb21e` 上下文 |
+| 區塊 2／B2-5 | 完成、已 Commit／Push | `5bece56` 輸出統一 |
+| 區塊 2／B2-6 | 完成、已 Commit／Push | `7037657` 共用證據 |
+| 區塊 2／B2-7 | 完成、已 Commit／Push | `6b05e3f` 持久化與查詢 |
 | 區塊 3 Path A／B3A-1、B3A-2、B3A-3、B3A-4、B3A-5 | 未開始 | 等待指示 |
 | 區塊 3 Path B／B3B | 未開始 | 等待指示 |
 | 區塊 4／B4-1、B4-2、B4-3、B4-4、B4-5、B4-6、B4-7、B4-8 | 未開始 | 等待指示 |
 
 每個功能模組先測試並更新 README／進度、檢查暫存檔案及憑證模式，再建立 Conventional Commit 並立即 Push，才開始下一模組。Hash 在後續文件補記，未使用 amend／force push。
 
-## 測試紀錄
+## 區塊 1 歷史測試紀錄
 
 | 階段 | 實際結果 |
 |---|---|
@@ -60,7 +66,7 @@ git diff --check
 - 新增 AI_JUDGE_PHASE1_*、AI_JUDGE_GENAI_*、AI_JUDGE_SAMPLING_* 設定，.env.example 不含真實憑證。
 - 新增 NumPy，httpx 列為正式依賴，requirements-dev.lock 同步。
 
-## 限制與待確認
+## 區塊 1 交付時的限制與待確認
 
 - 真實 GenAI 供應商、模型及提示版本仍需專案設定；只交付 Chat Completions 相容 adapter，不宣稱驗證真實模型品質。
 - hash char n-gram 文字表示可替換；kernel／品質設定為工程起點，不代表已確認研究方法。候選最多 500，超限拒絕，不截取前 N 筆或退回普通隨機抽樣。
@@ -102,3 +108,10 @@ git diff --check
 
 - B2-7：`6b05e3f` 已 Commit／Push。
 - B2-3 完成：202 持久化啟動、獨立 worker、逐輪順序／案例隔離、失敗保存與剩餘輪次跳過、雙重明確啟用的 mock，預設無重試。152 單元測試通過；區塊 PostgreSQL 整合接續執行。提交 `feat(phase2): execute durable multi-turn target tests`。
+
+
+- B2-3：`56b1125` 已 Commit／Push。
+- 區塊 2 整合：完整 pytest 165 passed（153 單元、12 PostgreSQL），0 failed、0 skipped；真實 PostgreSQL 17 使用專屬測試 DB 與隨機 schema。新增 5 項 B2 整合與 1 項 OpenAPI 測試。既有 1 項 Starlette/httpx 警告。
+- `ruff check ai_judge migrations tests` 通過；B2 所有檔案 format 通過。工作目錄全域 format 僅因使用者未提交的 B1 generation 註解尾端空白失敗，未改寫該檔案；另以提交快照驗證遠端版本。
+- 尚未執行真實 Ollama／付費 GenAI；HTTP protocol 使用 transport 替身，持久化使用真實 PostgreSQL；mock 預設仍停用。
+- E2E-1 未開始，待 B3／B4 完成後實作共用 Orchestrator、完整啟動 API／CLI、雙軌及報告查詢。本次沒有提前實作或修改研究方法。

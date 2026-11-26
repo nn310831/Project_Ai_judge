@@ -1,6 +1,6 @@
 # AI Judge 後端
 
-依據 [實作計畫](CODEX_IMPLEMENTATION_PLAN.md) 分區塊交付。共同區塊 C-1 已完成；區塊 1 的四個模組已實作（下方列出 API）。區塊 2～4 尚未實作，沒有前端。
+依據 [實作計畫](CODEX_IMPLEMENTATION_PLAN.md) 分區塊交付。共同區塊 C-1、區塊 1 與區塊 2 的全部模組已實作（下方列出 API）。區塊 3、區塊 4 與 E2E-1 尚未實作，沒有前端。
 
 ## 安裝與啟動
 
@@ -27,7 +27,7 @@ uvicorn ai_judge.main:app --host 127.0.0.1 --port 8000
 | `AI_JUDGE_DB_CONNECT_TIMEOUT` | 5 秒，建立連線上限 |
 | `AI_JUDGE_DB_STATEMENT_TIMEOUT_MS` | 10000 毫秒，SQL 執行上限 |
 
-C-1 不呼叫模型；B1-3 提供正式 GenAI adapter，但預設停用，設定方式見下方。SQLite 僅用於單元測試替身；正式環境只接受 PostgreSQL。區塊 2 mock 預設停用、Path A mock 預設停用、Path B mock 預設啟用的要求，留待各區塊實作。
+C-1 不呼叫模型；B1-3 提供正式 GenAI adapter，但預設停用，設定方式見下方。SQLite 僅用於單元測試替身；正式環境只接受 PostgreSQL。區塊 2 mock 已實作且預設停用；Path A mock 預設停用、Path B mock 預設啟用的要求，留待區塊 3 實作。
 
 ## 已完成 HTTP API（C-1）
 
@@ -36,7 +36,7 @@ C-1 不呼叫模型；B1-3 提供正式 GenAI adapter，但預設停用，設定
 | Method／完整 path | 用途 | 成功回應 schema／範例 | 錯誤 |
 |---|---|---|---|
 | `GET /health/live` | 程序存活，不查資料庫 | 200，`{"status":"ok"}` | 無自訂業務錯誤 |
-| `GET /health/ready` | 查詢資料庫是否可用且遷移版本為 `0002_phase1_jobs` | 200，`{"status":"ready"}` | 503，`{"status":"unavailable"}`；連線／SQL 失敗、尚未遷移或版本不符 |
+| `GET /health/ready` | 查詢資料庫是否可用且遷移版本為 `0005_target_runs` | 200，`{"status":"ready"}` | 503，`{"status":"unavailable"}`；連線／SQL 失敗、尚未遷移或版本不符 |
 | `GET /openapi.json` | FastAPI 產生的 API schema | 200，OpenAPI JSON 物件，包含 `paths`、`components` | 無自訂業務錯誤 |
 | `GET /docs`、`GET /redoc` | FastAPI 自動 API 文件 | 200，HTML | 無自訂業務錯誤 |
 
@@ -233,7 +233,7 @@ kernel 可選 `linear: S=XXᵀ` 或 `rbf: Sᵢⱼ=exp(-gamma*||xᵢ-xⱼ||²)`�
 
 本機完整測試為 104 passed（97 單元、7 PostgreSQL 整合），涵蓋四模組流程、升級保留既有資料、整批失敗回滾、進度併行查詢、重複 ID 防護及重新連線後保存。OpenAPI 列出各成功回應與錯誤 schema。只有既有的 Starlette/httpx TestClient 棄用警告。
 
-真實付費 GenAI 未呼叫；HTTP protocol 以 transport 替身驗證，資料庫則為 PostgreSQL 17。未宣稱完成區塊 2～4 或全專案端到端驗收。操作紀錄尚無自動清理政策；對外部署存取控制、備份及分散式工作佇列不屬本次交付。後端維持本機 .venv，compose.test.yaml 僅提供測試 PostgreSQL。
+真實付費 GenAI 未呼叫；HTTP protocol 以 transport 替身驗證，資料庫則為 PostgreSQL 17。此處為區塊 1 交付時的驗收紀錄；區塊 2 結果見下方，區塊 3～4 與全專案端到端尚未完成。操作紀錄尚無自動清理政策；對外部署存取控制、備份及分散式工作佇列不屬本次交付。後端維持本機 .venv，compose.test.yaml 僅提供測試 PostgreSQL。
 
 區塊 PR：[PR #2](https://github.com/nn310831/Project_Ai_judge/pull/2)，目標 develop，依賴共同區塊 PR #1，等待檢閱。
 
@@ -270,7 +270,7 @@ kernel 可選 `linear: S=XXᵀ` 或 `rbf: Sᵢⱼ=exp(-gamma*||xᵢ-xⱼ||²)`�
 
 ### B2-4：上下文與 Sliding Window
 
-內部 `ConversationContext(sliding_window, window_turns, max_characters).prepare(query) -> ContextRequest`，回傳 messages、dropped_turns、context_characters；`.complete(query, public_response)` 只加入成功輪次。每個案例建立獨立物件。B2-3 將以單一 sliding_window 布林開關使用此模組（預設 false），不另外增加 HTTP endpoint。
+內部 `ConversationContext(sliding_window, window_turns, max_characters).prepare(query) -> ContextRequest`，回傳 messages、dropped_turns、context_characters；`.complete(query, public_response)` 只加入成功輪次。每個案例建立獨立物件。B2-3 以單一 sliding_window 布林開關使用此模組（預設 false），不另外增加 HTTP endpoint。
 
 啟用時只保留最近 window_turns 組完整 user／assistant 歷史；若超過字元預算再移除最舊完整對話。不刪 system prompt、不截斷當輪 query、不額外呼叫模型做摘要。關閉時保留全部歷史，超限明確失敗 `context_limit_exceeded`。歷史清空仍放不下當輪內容也會失敗。字元預算計算 role 與 content 長度，屬工程保護，不宣稱等同 tokenizer 的 token 數；Ollama num_ctx 另外限制模型 context。來源輸出要求為可觀察的公開說明，不要求模型私有內部思維鏈。
 
@@ -301,7 +301,7 @@ kernel 可選 `linear: S=XXᵀ` 或 `rbf: Sᵢⱼ=exp(-gamma*||xᵢ-xⱼ||²)`�
 | `/api/v1/target-models/test/ollama/{run_id}/cases` | `{"items":[{run_id,case_id,position,attack,status,total_rounds,completed_rounds,error}],"limit":20,"offset":0}` |
 | `/api/v1/target-models/test/ollama/{run_id}/cases/{case_id}/rounds` | `{"items":[{run_id,case_id,round_number,status,request,response,evidence,error,elapsed_ms,attempts,created_at,finished_at}],"limit":20,"offset":0}` |
 
-兩個清單使用 query limit（預設 20，1～100）、offset（預設 0，≥0），無 body；status 無 query/body。空頁或沒有輪次回傳 items=[]。尚未完成的 response/evidence/error/elapsed_ms/finished_at 可為 null。status 範例核心欄位 `{"id":"<UUID>","status":"queued","total_cases":2,"completed_cases":0,"failed_cases":0}`，其餘時間及 execution 依實際快照補齊，完整 schema 見 OpenAPI。完成案例包含失敗案例，failed_cases 另外計數；不將失敗視為 SAFE。B2-3 將接上 POST 啟動入口與 worker。
+兩個清單使用 query limit（預設 20，1～100）、offset（預設 0，≥0），無 body；status 無 query/body。空頁或沒有輪次回傳 items=[]。尚未完成的 response/evidence/error/elapsed_ms/finished_at 可為 null。status 範例核心欄位 `{"id":"<UUID>","status":"queued","total_cases":2,"completed_cases":0,"failed_cases":0}`，其餘時間及 execution 依實際快照補齊，完整 schema 見 OpenAPI。完成案例包含失敗案例，failed_cases 另外計數；不將失敗視為 SAFE。B2-3 的 POST 啟動入口與 worker 見下節。
 
 ### B2-3：多輪測試啟動與獨立 worker
 
@@ -326,3 +326,12 @@ POST 錯誤：404 load_not_found；403 target_mock_not_enabled／endpoint_not_al
 每輪最多呼叫一次，失敗不重試、不切換 mock；該案例剩餘輪次記為 skipped（attempts=0），下一案例使用獨立上下文繼續。全部成功為 succeeded、全部案例失敗為 failed、部分失敗為 partial；worker 中斷待其他 worker 清理過期 lease 後為 interrupted。尚未清理時 GET 保留 running 及 lease_expires_at。completed_rounds 是已處理輪次（包含 skipped），不是成功輪次。每輪保存當次 query/messages、參數、模型來源、公開回覆／標準化四欄、Path A/B 證據、錯誤及耗時；timeout 或傳輸失敗沒有回覆時保留 null，不偽造內容。
 
 模擬程式位於 runner.py 上半部且註明預設停用。只有本機 `AI_JUDGE_TARGET_MOCK_ENABLED=true` 且 request `use_mock=true` 才使用；結果保留 mock/source 標記。正式模式使用 Ollama Adapter，目前以 HTTP transport 替身驗證，未宣稱測過實際模型品質。
+
+
+### 區塊 2 驗收與範圍
+
+165 項測試通過（153 單元、12 PostgreSQL 整合），含 C-1／B1 回歸。B2 整合驗證成功 B1 抽樣快照 → 配置／載入／202 提交 → 獨立 runner → 重建連線查詢、兩 worker 防重複領取、併發重複 run ID 防護、過期任務保存／禁止重播，以及不啟動 FastAPI 的 worker CLI mock 執行。另驗證 OpenAPI 授權／成功／錯誤 schema。只有既有 Starlette/httpx 棄用警告。
+
+先執行 `alembic upgrade head` 升級到 0005；FastAPI、worker 及 Ollama 是不同程序，worker 與 FastAPI 使用同一 PostgreSQL。此專案的測試 compose 只啟動 PostgreSQL，並未將整個專案容器化。沒有背景 worker 時任務會保持 queued；程序中斷不自動重播推論，需保留紀錄後明確建立新的 run。
+
+本次只完成區塊 2。受測模型輸出與公開說明可查詢，但雙軌評判、分數、統計報告及單一完整評測啟動 API，依序留待區塊 3、區塊 4 與 E2E-1。現有 ConfigurationService、LoadingService、RunService、TargetRunner 與標準化函式供後續共用 Orchestrator 直接串接。

@@ -93,3 +93,6 @@ git diff --check
 
 - B2-4：`caeb21e` 已 Commit／Push。
 - B2-5 完成：供應商中立的公開輸出統一層，JSON／mapping／契約得到相同四欄，缺失推理不補造。134 單元測試通過，lint 通過。提交 `feat(phase2): normalize target model outputs`。
+
+- B2-5：`5bece56` 已 Commit／Push。
+- B2-6 完成：同一份可追溯的 Path A/B 公開推理資料、1 起算步驟、mock／來源標記與獨立副本，保留原四欄。137 單元測試通過，lint 通過。提交 `feat(phase2): standardize shared judging evidence`。

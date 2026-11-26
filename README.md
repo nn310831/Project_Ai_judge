@@ -278,3 +278,8 @@ kernel 可選 `linear: S=XXᵀ` 或 `rbf: Sᵢⱼ=exp(-gamma*||xᵢ-xⱼ||²)`�
 ### B2-5：統一模型公開輸出
 
 內部 `normalize_public_output(str|dict|ModelOutput) -> ModelOutput`、`normalize_reply(TargetReply) -> NormalizedReply`。Adapter 先轉換供應商 envelope，再由此層驗證原始四欄 situation/query/reasoning_steps/final_response；HTTP 與 Python mapping 得到一致結果，不新增 endpoint。保留 provider／model／mock 於外層中繼資料，不改原始四欄。缺少或空 reasoning_steps 回報 missing_reasoning_data；其他 JSON／型態／未知欄位／空內容錯誤回報 invalid_model_output。拒絕重複 JSON key、NaN、Markdown 包裝及自行猜測欄位，不補造 SAFE 或推理內容；由 runner 保存失敗。
+
+
+### B2-6：Path A／B 共用公開推理資料
+
+內部 `build_judging_input(NormalizedReply, run_id, case_id, round_number) -> JudgingInput`；`.as_path_input() -> dict` 提供兩路相同但互相獨立的 JSON-safe 副本。外層包含 run_id、case_id、round_number（1 起算）、provider、model、mock、source、output（原始四欄）與 steps（index 由 1 起算、text 保留原文）。source 為 model_public_output 或 mock_public_output；不宣稱為真實內部思維鏈，不改寫內容、不引入風險評分或研究門檻。缺失資料拒絕建立證據，供 B2-7 保存與未來 B3 使用。不新增 HTTP endpoint，不提前實作評審。

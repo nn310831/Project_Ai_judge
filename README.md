@@ -266,3 +266,10 @@ kernel 可選 `linear: S=XXᵀ` 或 `rbf: Sᵢⱼ=exp(-gamma*||xᵢ-xⱼ||²)`�
 內部 `LoadingService.load_job(LoadRequest) -> UUID`、`.load_snapshot(model_config_id, SamplingSnapshot, sampling_job_id=None) -> UUID`、`.get(load_id) -> LoadedTarget`。直接快照入口供後續 Orchestrator 使用，兩者均驗證同一份資料契約；快照包含完整 AttackData、UUID、抽樣設定及生效模型設定，不因呼叫端後續修改而變動。新增 migration 0004_target_loads／target_loads，以外鍵關聯設定並保存 JSONB 快照。
 
 `AdapterRegistry.resolve(provider) -> TargetAdapter` 保留其他架設方法擴充；目前只有 Ollama。`TargetAdapter.chat(TargetConfig, messages) -> TargetReply` 與業務層分離。Ollama 使用 `/api/chat`、stream=false、四欄 JSON schema 與白名單 options，參考 [Ollama API](https://docs.ollama.com/api/chat) 及 [structured outputs](https://docs.ollama.com/capabilities/structured-outputs)。共享 httpx client，拒絕 redirect，設定 timeout／回應上限，失敗不自動重試（每輪最多一次）。錯誤包括 target_timeout、target_http_error、target_connection_error、target_response_too_large、target_provider_error、target_incomplete_output、target_refused、target_empty_output、invalid_target_envelope。未做真實 Ollama 呼叫；HTTP transport 替身驗證 protocol。
+
+
+### B2-4：上下文與 Sliding Window
+
+內部 `ConversationContext(sliding_window, window_turns, max_characters).prepare(query) -> ContextRequest`，回傳 messages、dropped_turns、context_characters；`.complete(query, public_response)` 只加入成功輪次。每個案例建立獨立物件。B2-3 將以單一 sliding_window 布林開關使用此模組（預設 false），不另外增加 HTTP endpoint。
+
+啟用時只保留最近 window_turns 組完整 user／assistant 歷史；若超過字元預算再移除最舊完整對話。不刪 system prompt、不截斷當輪 query、不額外呼叫模型做摘要。關閉時保留全部歷史，超限明確失敗 `context_limit_exceeded`。歷史清空仍放不下當輪內容也會失敗。字元預算計算 role 與 content 長度，屬工程保護，不宣稱等同 tokenizer 的 token 數；Ollama num_ctx 另外限制模型 context。來源輸出要求為可觀察的公開說明，不要求模型私有內部思維鏈。

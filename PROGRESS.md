@@ -87,3 +87,6 @@ git diff --check
 
 - B2-1：`e873f36` 已 Commit／Push。
 - B2-2 完成：載入成功 B1-4 job 或直接快照，禁止暗中重新抽樣；不可變 load 快照、migration 0004、Ollama adapter 與可替換 registry。單元測試 119 passed，lint 通過。提交 `feat(phase2): load sampling snapshots and add Ollama adapter`。
+
+- B2-2：`26f45f8` 已 Commit／Push。
+- B2-4 完成：可開關的完整歷史對話視窗、字元上限、案例隔離、超限錯誤；供 runner 內部呼叫，不新增 endpoint。123 單元測試通過，lint 通過。提交 `feat(phase2): implement isolated sliding-window context`。

@@ -1,6 +1,6 @@
 # 開發進度
 
-更新日期：2026-11-27（Asia/Taipei）。本次僅實作 B3A-1，程式與 23 項新增測試完成；全部單元測試 176 passed。依第 1.1 節完成版本交付後停止，等待下一次單模組授權。
+更新日期：2026-11-27（Asia/Taipei）。本次僅實作 B3A-1，程式與 23 項新增測試完成；全部單元測試 176 passed。已 Commit／Push，依第 1.1 節停止，等待下一次單模組授權。
 
 ## Repository 與分支
 
@@ -26,7 +26,7 @@
 | 區塊 2／B2-5 | 完成、已 Commit／Push | `5bece56` 輸出統一 |
 | 區塊 2／B2-6 | 完成、已 Commit／Push | `7037657` 共用證據 |
 | 區塊 2／B2-7 | 完成、已 Commit／Push | `6b05e3f` 持久化與查詢 |
-| 區塊 3 Path A／B3A-1 | 實作及測試完成 | 本次交付，Commit 見下方紀錄 |
+| 區塊 3 Path A／B3A-1 | 完成、已 Commit／Push | `1af9779` 三位 Judge 輸入整理 |
 | 區塊 3 Path A／B3A-2、B3A-3、B3A-4、B3A-5 | 未開始 | 等待各次單模組授權 |
 | 區塊 3 Path B／B3B | 未開始 | 等待指示 |
 | 區塊 4／B4-1、B4-2、B4-3、B4-4、B4-5、B4-6、B4-7、B4-8 | 未開始 | 等待指示 |
@@ -138,3 +138,11 @@ git diff --check
 - 正式／mock：本模組不呼叫外部模型、不實作評審 mock；僅保留 B2 target mock 來源。評審 Adapter、密鑰管理、裁決、Path B、評分及 E2E-1 尚未實作。
 - 已知限制：需要專案提供已確認的評判規範及版本，未驗證真實 Judge 品質；訊息格式是內容片段，不是完整 HTTP 請求。後續 Adapter 需驗證指定模型、token 預算及結構化輸出相容性。
 - 建議下一個模組：B3A-2（GPT 評審介面與模型設定），需另獲明確授權。本次完成後停止。
+
+
+### B3A-1 版本交付
+
+- 實作 Commit `1af9779c4002d83d5aa4682d06e17c4747805c5f` 已推送至 origin/feature/phase3-judge-inputs。
+- 以 git archive 建立乾淨提交快照再次確認：176 單元測試通過、全域 Ruff lint／format 通過（64 個檔案）。原有七個使用者修改均保留且未提交。
+- [GitHub Actions](https://github.com/nn310831/Project_Ai_judge/actions/runs/45858279346/job/140042294833) 已啟動；此紀錄建立時執行中，最終狀態以 Actions 為準。
+- 本次不是區塊 3 最後一個模組，不提前執行區塊 3 全流程驗收或建立完成 PR。B3A-2 僅為建議下一模組，尚未開始。

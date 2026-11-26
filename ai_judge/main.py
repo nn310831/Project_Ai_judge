@@ -12,6 +12,7 @@ from ai_judge.phase1.operations import Operations
 from ai_judge.phase1.routes import router
 from ai_judge.phase1.sampling import SamplingService, SamplingSettings
 from ai_judge.phase1.settings import Phase1Settings
+from ai_judge.phase2.adapters import AdapterRegistry, OllamaAdapter
 from ai_judge.phase2.contracts import TargetError
 from ai_judge.phase2.routes import router as target_router
 from ai_judge.phase2.settings import TargetSettings
@@ -42,6 +43,7 @@ def create_app(
             follow_redirects=False, trust_env=False, timeout=settings.timeout_seconds
         )
         app.state.generator = generator or ChatCompletionsGenerator(settings, client)
+        app.state.target_registry = AdapterRegistry({"ollama": OllamaAdapter(client)})
         app.state.sampler = SamplingService(
             Operations(app.state.database),
             sampling_settings or SamplingSettings(),

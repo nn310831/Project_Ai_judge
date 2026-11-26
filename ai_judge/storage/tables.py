@@ -2,8 +2,24 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 
 metadata = sa.MetaData()
-SCHEMA_REVISION = "0003_target_configs"
+SCHEMA_REVISION = "0004_target_loads"
 json_type = sa.JSON().with_variant(JSONB(), "postgresql")
+
+target_loads = sa.Table(
+    "target_loads",
+    metadata,
+    sa.Column("id", sa.Uuid(), primary_key=True),
+    sa.Column(
+        "model_config_id",
+        sa.Uuid(),
+        sa.ForeignKey("target_configs.id", ondelete="RESTRICT"),
+        nullable=False,
+    ),
+    sa.Column("payload", json_type, nullable=False),
+    sa.Column(
+        "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+    ),
+)
 
 target_configs = sa.Table(
     "target_configs",

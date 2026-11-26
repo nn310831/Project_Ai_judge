@@ -84,3 +84,6 @@ git diff --check
 - 實作順序依內部相依性安排 B2-1、B2-2、B2-4、B2-5、B2-6、B2-7、B2-3，不改原始模組編號；每模組測試後立即 Commit／Push。
 - 開始前既有單元測試 97 passed。
 - B2-1 完成：不可變模型設定、參數白名單、受保護 API、端點允許清單、migration 0003；配置不呼叫模型。單元測試 108 passed；新增／修改程式 lint 通過。Commit 訊息 `feat(phase2): implement target model configuration`，Hash 於下一紀錄補入。
+
+- B2-1：`e873f36` 已 Commit／Push。
+- B2-2 完成：載入成功 B1-4 job 或直接快照，禁止暗中重新抽樣；不可變 load 快照、migration 0004、Ollama adapter 與可替換 registry。單元測試 119 passed，lint 通過。提交 `feat(phase2): load sampling snapshots and add Ollama adapter`。

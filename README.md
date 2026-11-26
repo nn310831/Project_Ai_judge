@@ -255,3 +255,14 @@ kernel 可選 `linear: S=XXᵀ` 或 `rbf: Sᵢⱼ=exp(-gamma*||xᵢ-xⱼ||²)`�
 設定欄位：provider 固定 ollama、base_url／model 必填非空字串、model_version 可選；timeout_seconds 預設 30（1～60 秒）、context_max_characters 預設 24000（512～256000）、window_turns 預設 6（1～100）、max_response_bytes 預設 1000000（100～5000000）。parameters 白名單：temperature 0～2（預設 .7）、top_p >0 且 ≤1（.9）、top_k 1～200（40）、num_predict 1～8192（2048）、num_ctx 512～131072（8192）、seed -1～2^31−1（0）；num_predict 必須小於 num_ctx。不接受未知參數或 bool 冒充整數。這些上限為工程限制，不是已確認研究設定。
 
 內部 `ConfigurationService(database, TargetSettings).create(TargetConfig) -> UUID`、`.get(UUID) -> TargetConfig`；經 C-1 `TargetRepository` 保存。新增 migration `0003_target_configs`／target_configs（UUID、payload JSONB、created_at）。token 是整個管理 API 的共享授權，尚非多租戶 ACL。
+
+
+### B2-2：載入抽樣快照與 Ollama Adapter
+
+`POST /api/v1/target-models/load/ollama`（需 Bearer token），body `{"model_config_id":"<UUID>","sampling_job_id":"<successful B1-4 job UUID>"}`，無 query/path。201 回傳 `{"load_id":"<UUID>","model_config_id":"<UUID>","sampling_job_id":"<UUID>","case_count":10}`。只載入並保存設定與抽樣快照，不重新抽樣、不呼叫推論。
+
+404：model_config_not_found／sampling_job_not_found；422：invalid_sampling_job（非 sampling 或未成功）、invalid_sampling_snapshot（格式、重複 ID 或 k／案例數不符）、too_many_cases／too_many_rounds／unsupported_provider；403：端點不在允許清單；401／503 授權規則同 B2-1。領域錯誤形狀為 `{"error":"code"}`；UUID／輸入型態錯誤使用 FastAPI 422 detail。case／round 上限由 AI_JUDGE_TARGET_MAX_CASES（預設 500，最多 500）及 MAX_ROUNDS_PER_CASE（預設 100，最多 1000）管理。
+
+內部 `LoadingService.load_job(LoadRequest) -> UUID`、`.load_snapshot(model_config_id, SamplingSnapshot, sampling_job_id=None) -> UUID`、`.get(load_id) -> LoadedTarget`。直接快照入口供後續 Orchestrator 使用，兩者均驗證同一份資料契約；快照包含完整 AttackData、UUID、抽樣設定及生效模型設定，不因呼叫端後續修改而變動。新增 migration 0004_target_loads／target_loads，以外鍵關聯設定並保存 JSONB 快照。
+
+`AdapterRegistry.resolve(provider) -> TargetAdapter` 保留其他架設方法擴充；目前只有 Ollama。`TargetAdapter.chat(TargetConfig, messages) -> TargetReply` 與業務層分離。Ollama 使用 `/api/chat`、stream=false、四欄 JSON schema 與白名單 options，參考 [Ollama API](https://docs.ollama.com/api/chat) 及 [structured outputs](https://docs.ollama.com/capabilities/structured-outputs)。共享 httpx client，拒絕 redirect，設定 timeout／回應上限，失敗不自動重試（每輪最多一次）。錯誤包括 target_timeout、target_http_error、target_connection_error、target_response_too_large、target_provider_error、target_incomplete_output、target_refused、target_empty_output、invalid_target_envelope。未做真實 Ollama 呼叫；HTTP transport 替身驗證 protocol。

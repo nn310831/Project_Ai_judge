@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from ai_judge.phase2.configuration import ConfigurationService
 from ai_judge.phase2.contracts import TargetConfig, TargetError
+from ai_judge.phase2.loading import LoadingService, LoadRequest
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -42,3 +43,26 @@ def create_config(body: TargetConfig, request: Request):
 def get_config(model_config_id: UUID, request: Request):
     service = ConfigurationService(request.app.state.database, request.app.state.target_settings)
     return {"model_config_id": model_config_id, "configuration": service.get(model_config_id)}
+
+
+class LoadResult(BaseModel):
+    load_id: UUID
+    model_config_id: UUID
+    sampling_job_id: UUID
+    case_count: int
+
+
+@router.post("/load/ollama", status_code=201, response_model=LoadResult)
+def load_ollama(body: LoadRequest, request: Request):
+    service = LoadingService(
+        request.app.state.database,
+        request.app.state.target_settings,
+        request.app.state.target_registry,
+    )
+    identifier = service.load_job(body)
+    return {
+        "load_id": identifier,
+        "model_config_id": body.model_config_id,
+        "sampling_job_id": body.sampling_job_id,
+        "case_count": len(service.get(identifier).snapshot.samples),
+    }

@@ -273,3 +273,8 @@ kernel 可選 `linear: S=XXᵀ` 或 `rbf: Sᵢⱼ=exp(-gamma*||xᵢ-xⱼ||²)`�
 內部 `ConversationContext(sliding_window, window_turns, max_characters).prepare(query) -> ContextRequest`，回傳 messages、dropped_turns、context_characters；`.complete(query, public_response)` 只加入成功輪次。每個案例建立獨立物件。B2-3 將以單一 sliding_window 布林開關使用此模組（預設 false），不另外增加 HTTP endpoint。
 
 啟用時只保留最近 window_turns 組完整 user／assistant 歷史；若超過字元預算再移除最舊完整對話。不刪 system prompt、不截斷當輪 query、不額外呼叫模型做摘要。關閉時保留全部歷史，超限明確失敗 `context_limit_exceeded`。歷史清空仍放不下當輪內容也會失敗。字元預算計算 role 與 content 長度，屬工程保護，不宣稱等同 tokenizer 的 token 數；Ollama num_ctx 另外限制模型 context。來源輸出要求為可觀察的公開說明，不要求模型私有內部思維鏈。
+
+
+### B2-5：統一模型公開輸出
+
+內部 `normalize_public_output(str|dict|ModelOutput) -> ModelOutput`、`normalize_reply(TargetReply) -> NormalizedReply`。Adapter 先轉換供應商 envelope，再由此層驗證原始四欄 situation/query/reasoning_steps/final_response；HTTP 與 Python mapping 得到一致結果，不新增 endpoint。保留 provider／model／mock 於外層中繼資料，不改原始四欄。缺少或空 reasoning_steps 回報 missing_reasoning_data；其他 JSON／型態／未知欄位／空內容錯誤回報 invalid_model_output。拒絕重複 JSON key、NaN、Markdown 包裝及自行猜測欄位，不補造 SAFE 或推理內容；由 runner 保存失敗。

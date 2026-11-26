@@ -90,3 +90,6 @@ git diff --check
 
 - B2-2：`26f45f8` 已 Commit／Push。
 - B2-4 完成：可開關的完整歷史對話視窗、字元上限、案例隔離、超限錯誤；供 runner 內部呼叫，不新增 endpoint。123 單元測試通過，lint 通過。提交 `feat(phase2): implement isolated sliding-window context`。
+
+- B2-4：`caeb21e` 已 Commit／Push。
+- B2-5 完成：供應商中立的公開輸出統一層，JSON／mapping／契約得到相同四欄，缺失推理不補造。134 單元測試通過，lint 通過。提交 `feat(phase2): normalize target model outputs`。

@@ -283,3 +283,22 @@ kernel 可選 `linear: S=XXᵀ` 或 `rbf: Sᵢⱼ=exp(-gamma*||xᵢ-xⱼ||²)`�
 ### B2-6：Path A／B 共用公開推理資料
 
 內部 `build_judging_input(NormalizedReply, run_id, case_id, round_number) -> JudgingInput`；`.as_path_input() -> dict` 提供兩路相同但互相獨立的 JSON-safe 副本。外層包含 run_id、case_id、round_number（1 起算）、provider、model、mock、source、output（原始四欄）與 steps（index 由 1 起算、text 保留原文）。source 為 model_public_output 或 mock_public_output；不宣稱為真實內部思維鏈，不改寫內容、不引入風險評分或研究門檻。缺失資料拒絕建立證據，供 B2-7 保存與未來 B3 使用。不新增 HTTP endpoint，不提前實作評審。
+
+
+### B2-7：持久化任務、每輪紀錄與查詢
+
+新增 migration `0005_target_runs`：target_runs 保存 run ID、載入快照／當次生效參數、queued/running/succeeded/failed/interrupted/partial 狀態、真實案例進度、owner／lease 與錯誤；target_cases 保存原始攻擊、案例順序／狀態／輪數；target_rounds 以 run_id/case_id/round_number 為鍵，保存 request、response、evidence、error、elapsed_ms、attempts 與起訖時間。外鍵與 transaction 確保關聯完整。round_number 與推理步驟 index 都由 1 起算。
+
+內部 `RunService.submit(TestRequest, run_id=None) -> UUID` 先原子保存 queued run／案例；TestRequest 包含 load_id、sliding_window（預設 false）、model_parameters（可選白名單覆寫）、use_mock（預設 false）。覆寫只影響當次快照，不修改已保存 config/load；參數合併後再檢查 num_predict < num_ctx。use_mock=true 還需本機 AI_JUDGE_TARGET_MOCK_ENABLED=true，否則 403 target_mock_not_enabled。重複 run ID 為 409 run_id_exists，不重複執行；無效覆寫為 422 invalid_effective_parameters。
+
+`RunRepository` 必須在 C-1 transaction 中使用：enqueue、claim、renew、begin_round、finish_round、finish_case、finish_run、reap_expired、get／list_cases／list_rounds。PostgreSQL claim 使用 FOR UPDATE SKIP LOCKED 加狀態條件，防止多 worker 重複領取；300 秒 lease 在每輪前後更新，失去 owner／lease 後禁止寫入。每次模型呼叫前先保存 running 輪次；中斷後 worker 將過期任務標示 interrupted，正在呼叫的輪次標記 inference_state_unknown，不自動重新入列。查詢 API 僅讀保存資料，不執行推論或復原。
+
+以下 GET 均要求 Bearer token、不呼叫外部模型，path run_id／case_id 為 UUID；run 查無回傳 404 `{"error":"run_not_found"}`，資料庫故障 503 `{"error":"storage_unavailable"}`，驗證錯誤 422 detail，授權同 B2-1。
+
+| HTTP path | 200 response schema／用途 |
+|---|---|
+| `/api/v1/target-models/test/ollama/{run_id}` | id、load_id、status、total_cases、completed_cases、failed_cases、current_case_id、current_round、error、created_at、finished_at、lease_expires_at、execution；execution 含 model_config_id/provider/model/parameters/mock/sliding_window/max_attempts_per_round，不回傳端點或 token |
+| `/api/v1/target-models/test/ollama/{run_id}/cases` | `{"items":[{run_id,case_id,position,attack,status,total_rounds,completed_rounds,error}],"limit":20,"offset":0}` |
+| `/api/v1/target-models/test/ollama/{run_id}/cases/{case_id}/rounds` | `{"items":[{run_id,case_id,round_number,status,request,response,evidence,error,elapsed_ms,attempts,created_at,finished_at}],"limit":20,"offset":0}` |
+
+兩個清單使用 query limit（預設 20，1～100）、offset（預設 0，≥0），無 body；status 無 query/body。空頁或沒有輪次回傳 items=[]。尚未完成的 response/evidence/error/elapsed_ms/finished_at 可為 null。status 範例核心欄位 `{"id":"<UUID>","status":"queued","total_cases":2,"completed_cases":0,"failed_cases":0}`，其餘時間及 execution 依實際快照補齊，完整 schema 見 OpenAPI。完成案例包含失敗案例，failed_cases 另外計數；不將失敗視為 SAFE。B2-3 將接上 POST 啟動入口與 worker。

@@ -96,3 +96,6 @@ git diff --check
 
 - B2-5：`5bece56` 已 Commit／Push。
 - B2-6 完成：同一份可追溯的 Path A/B 公開推理資料、1 起算步驟、mock／來源標記與獨立副本，保留原四欄。137 單元測試通過，lint 通過。提交 `feat(phase2): standardize shared judging evidence`。
+
+- B2-6：`7037657` 已 Commit／Push。
+- B2-7 完成：queued run／案例快照、每輪 running→終止紀錄、參數／耗時／錯誤／證據、分頁查詢、lease／owner 與過期標記。migration 0005；當次參數覆寫隔離，查詢不重新執行。141 單元測試通過；真實 PostgreSQL 區塊整合在最後執行。提交 `feat(phase2): persist target runs and round records`。

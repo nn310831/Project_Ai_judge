@@ -23,12 +23,6 @@ class OllamaParameters(Contract):
     num_ctx: int = Field(default=8192, ge=512, le=131072)
     seed: int = Field(default=0, ge=-1, le=2**31 - 1)
 
-    @model_validator(mode="after")
-    def fits_context(self) -> Self:
-        if self.num_predict >= self.num_ctx:
-            raise ValueError("num_predict must be smaller than num_ctx")
-        return self
-
 
 class TargetConfig(Contract):
     provider: Literal["ollama"] = "ollama"
@@ -40,6 +34,12 @@ class TargetConfig(Contract):
     context_max_characters: int = Field(default=24000, ge=512, le=256000)
     window_turns: int = Field(default=6, ge=1, le=100)
     max_response_bytes: int = Field(default=1_000_000, ge=100, le=5_000_000)
+
+    @model_validator(mode="after")
+    def fits_context(self) -> Self:
+        if self.parameters.num_predict >= self.parameters.num_ctx:
+            raise ValueError("num_predict must be smaller than num_ctx")
+        return self
 
     @field_validator("base_url")
     @classmethod

@@ -63,6 +63,10 @@ def create_app(
     async def target_error_handler(request, error):
         return JSONResponse(status_code=error.status, content={"error": error.code})
 
+    @app.exception_handler(StorageError)
+    async def storage_error_handler(request, error):
+        return JSONResponse(status_code=503, content={"error": "storage_unavailable"})
+
     @app.get("/health/live", response_model=Health, tags=["C-1"])
     def live():
         return {"status": "ok"}

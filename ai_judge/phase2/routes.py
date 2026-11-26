@@ -1,13 +1,16 @@
 import secrets
+from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
 from ai_judge.phase2.configuration import ConfigurationService
 from ai_judge.phase2.contracts import TargetConfig, TargetError
 from ai_judge.phase2.loading import LoadingService, LoadRequest
+from ai_judge.phase2.records import RunService
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -65,4 +68,68 @@ def load_ollama(body: LoadRequest, request: Request):
         "model_config_id": body.model_config_id,
         "sampling_job_id": body.sampling_job_id,
         "case_count": len(service.get(identifier).snapshot.samples),
+    }
+
+
+def run_service(request: Request) -> RunService:
+    return RunService(
+        request.app.state.database,
+        request.app.state.target_settings,
+        request.app.state.target_registry,
+    )
+
+
+class RunStatus(BaseModel):
+    id: UUID
+    load_id: UUID
+    status: Literal["queued", "running", "succeeded", "failed", "interrupted", "partial"]
+    total_cases: int
+    completed_cases: int
+    failed_cases: int
+    current_case_id: UUID | None
+    current_round: int | None
+    error: str | None
+    created_at: datetime
+    finished_at: datetime | None
+    lease_expires_at: datetime | None
+    execution: dict
+
+
+class RecordPage(BaseModel):
+    items: list[dict]
+    limit: int
+    offset: int
+
+
+@router.get("/test/ollama/{run_id}", response_model=RunStatus)
+def run_status(run_id: UUID, request: Request):
+    return run_service(request).status(run_id)
+
+
+@router.get("/test/ollama/{run_id}/cases", response_model=RecordPage)
+def case_records(
+    run_id: UUID,
+    request: Request,
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+):
+    return {
+        "items": run_service(request).cases(run_id, limit, offset),
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+@router.get("/test/ollama/{run_id}/cases/{case_id}/rounds", response_model=RecordPage)
+def round_records(
+    run_id: UUID,
+    case_id: UUID,
+    request: Request,
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+):
+    return {
+        "items": run_service(request).rounds(run_id, case_id, limit, offset),
+        "limit": limit,
+        "offset": offset,
     }

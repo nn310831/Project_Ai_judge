@@ -1,6 +1,6 @@
 # 開發進度
 
-更新日期：2026-11-26（Asia/Taipei）。區塊 2 七個模組均已獨立測試、Commit、Push；165 項完整測試通過，已建立 PR #3。停止於區塊 2，等待使用者指示下一區塊。
+更新日期：2026-11-27（Asia/Taipei）。本次僅實作 B3A-1，程式與 23 項新增測試完成；全部單元測試 176 passed。依第 1.1 節完成版本交付後停止，等待下一次單模組授權。
 
 ## Repository 與分支
 
@@ -26,11 +26,12 @@
 | 區塊 2／B2-5 | 完成、已 Commit／Push | `5bece56` 輸出統一 |
 | 區塊 2／B2-6 | 完成、已 Commit／Push | `7037657` 共用證據 |
 | 區塊 2／B2-7 | 完成、已 Commit／Push | `6b05e3f` 持久化與查詢 |
-| 區塊 3 Path A／B3A-1、B3A-2、B3A-3、B3A-4、B3A-5 | 未開始 | 等待指示 |
+| 區塊 3 Path A／B3A-1 | 實作及測試完成 | 本次交付，Commit 見下方紀錄 |
+| 區塊 3 Path A／B3A-2、B3A-3、B3A-4、B3A-5 | 未開始 | 等待各次單模組授權 |
 | 區塊 3 Path B／B3B | 未開始 | 等待指示 |
 | 區塊 4／B4-1、B4-2、B4-3、B4-4、B4-5、B4-6、B4-7、B4-8 | 未開始 | 等待指示 |
 
-每個功能模組先測試並更新 README／進度、檢查暫存檔案及憑證模式，再建立 Conventional Commit 並立即 Push，才開始下一模組。Hash 在後續文件補記，未使用 amend／force push。
+每個功能模組先測試並更新 README／進度、檢查暫存檔案及憑證模式，再建立 Conventional Commit 並立即 Push，回報並停止，收到下一次明確授權才開始下一模組。Hash 在後續文件補記，未使用 amend／force push。
 
 ## 區塊 1 歷史測試紀錄
 
@@ -125,3 +126,15 @@ git diff --check
 - 整合 Commit 的 [Push CI](https://github.com/nn310831/Project_Ai_judge/actions/runs/45848992522/job/140010046132) 已確認 success；[PR CI](https://github.com/nn310831/Project_Ai_judge/actions/runs/45849096372/job/140010411877) 建立後執行中，最新結果以 PR checks 為準。交付紀錄另以 docs Commit 推送，不 amend／force push。
 - 專用 PostgreSQL 測試容器與網路已執行 compose down 移除；未讀取或操作 compose.dev.yaml 或開發資料庫。
 - 本次沒有阻擋後續的測試失敗；真實 Ollama 品質、B3／B4 與 E2E-1 尚未驗收。收到下一區塊指示前不繼續實作。
+
+
+## B3A-1（2026-11-27）：三位 Judge 輸入整理
+
+- 唯一授權模組 B3A-1，依賴已完成 B2-6。開始前確認 Git status／remote／log／ls-remote、既有程式及測試；原分支與遠端均為 d38f0be，main／develop 仍 245ef66，沒有遠端分歧。
+- 本次分支 `feature/phase3-judge-inputs`，從 d38f0be 延伸，沿用原有 Repository；保留既有七個修改檔案：.env.example、.gitignore、CODEX_IMPLEMENTATION_PLAN.md、B1 generation／sampling、storage/repository.py、test_storage.py，均不納入本次提交。
+- 檔案：新增 phase3/__init__.py、phase3/inputs.py、tests/unit/test_phase3_inputs.py；更新 README、PROGRESS。沒有新增依賴、HTTP endpoint、資料庫 migration、環境設定或既有資料契約變更。
+- 完成：B2 物件／保存的 evidence 驗證、相同公開輸出與步驟／來源／ID 快照、明確傳入 JudgePolicy、版本紀錄、GPT／Claude／Gemini 內容片段、無副作用的獨立副本、規範與不可信資料訊息分離。附既有 JudgeResult schema，不擅定研究評分規則。
+- 實際測試：開始前 153 單元通過；新增檔案 23 passed；完成後全部單元 176 passed，既有 Starlette/httpx 警告 1 項。Ruff 全域 lint 通過，新檔 format 通過。包含 B2 mock runner→持久化 evidence→B3A-1 三格式的內部串接（SQLite 單元替身）。本機本次未執行 PostgreSQL 整合，無資料庫變更；區塊 3 整合／PR 待最後模組完成。
+- 正式／mock：本模組不呼叫外部模型、不實作評審 mock；僅保留 B2 target mock 來源。評審 Adapter、密鑰管理、裁決、Path B、評分及 E2E-1 尚未實作。
+- 已知限制：需要專案提供已確認的評判規範及版本，未驗證真實 Judge 品質；訊息格式是內容片段，不是完整 HTTP 請求。後續 Adapter 需驗證指定模型、token 預算及結構化輸出相容性。
+- 建議下一個模組：B3A-2（GPT 評審介面與模型設定），需另獲明確授權。本次完成後停止。

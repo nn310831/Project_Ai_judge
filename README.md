@@ -1,6 +1,6 @@
 # AI Judge 後端
 
-依據 [實作計畫](CODEX_IMPLEMENTATION_PLAN.md) 分區塊交付。共同區塊 C-1、區塊 1 與區塊 2 的全部模組已實作（下方列出 API）。區塊 3、區塊 4 與 E2E-1 尚未實作，沒有前端。
+依據 [實作計畫](CODEX_IMPLEMENTATION_PLAN.md) 分區塊交付。共同區塊 C-1、區塊 1 與區塊 2 的全部模組已實作（下方列出 API）。區塊 3 已完成 B3A-1 輸入整理，其餘模組、區塊 4 與 E2E-1 尚未實作，沒有前端。
 
 ## 安裝與啟動
 
@@ -338,3 +338,40 @@ POST 錯誤：404 load_not_found；403 target_mock_not_enabled／endpoint_not_al
 
 
 區塊 2 交付：[PR #3](https://github.com/nn310831/Project_Ai_judge/pull/3)，目標 develop，依賴 PR #2／#1，尚未合併。每模組的 Commit 與驗證紀錄見 [PROGRESS.md](PROGRESS.md)。
+
+
+## 區塊 3：B3A-1 三位 Judge 輸入整理
+
+`ai_judge.phase3.inputs.prepare_judge_inputs(evidence, policy) -> dict[Judge, PreparedJudgeInput]` 是純內部函式，供後續 Judge Adapter 與 Orchestrator 使用，不新增 HTTP API、設定環境變數或資料庫 migration。輸入 evidence 接受 B2-6 的 `JudgingInput` 物件，或 B2-7 每輪保存的 `evidence` dictionary。缺少或格式不正確的資料會拒絕，不產生假判定。
+
+`JudgePolicy(judge_version, instructions)` 必須由受信任的呼叫端明確提供非空評判規範與版本，兩欄皆無預設值；不從待評測文字產生規範，也未擅定 SAFE／UNSAFE 門檻、安全分數對應或裁決規則。此處只準備輸入，規範的研究適用性仍由專案確認。
+
+```python
+from ai_judge.phase3.inputs import JudgePolicy, prepare_judge_inputs
+
+# saved_round 為 RunService.rounds(...) 取得的一筆成功輪次；
+# confirmed_version／confirmed_rubric 為呼叫端提供的已確認規範。
+prepared = prepare_judge_inputs(
+    saved_round["evidence"],
+    JudgePolicy(judge_version=confirmed_version, instructions=confirmed_rubric),
+)
+gpt_content = prepared["gpt"].content_payload()
+claude_content = prepared["claude"].content_payload()
+gemini_content = prepared["gemini"].content_payload()
+```
+
+每個 PreparedJudgeInput 保存 judge、run_id、case_id、round_number、target_mock、judge_version、format_version（judge-input-v1）、instructions 與 evidence_json。三位 Judge 使用完全相同的規範及證據快照，只轉換訊息容器。`content_payload()` 每次產生獨立 dict，不影響其他評審或 Path B 的資料；原始輸入及 policy 之後變動也不改寫已整理的內容。
+
+| judge | content_payload 內容格式 | 參考 |
+|---|---|---|
+| gpt | messages：developer 放規範，user 放證據 JSON | [OpenAI Chat Completions](https://developers.openai.com/api/reference/resources/chat) |
+| claude | 頂層 system 放規範，messages 的 user text block 放證據 JSON | [Claude Messages](https://platform.claude.com/docs/en/api/messages/create) |
+| gemini | systemInstruction.parts 放規範，contents 的 user parts 放證據 JSON | [Gemini generateContent](https://ai.google.dev/api/generate-content) |
+
+以上是訊息內容片段，**不是完整可執行的供應商 HTTP request**；模型名稱／版本、密鑰、推論參數、timeout、結構化輸出 API 選項及回應驗證分別留待 B3A-2～4。GPT 片段採 developer 角色，未來 Adapter 須依所選模型確認相容性。本次沒有發出模型呼叫，也沒有實作 Judge mock；B2 mock 標記僅作為 target_mock／證據來源保存，不能解讀成評審已執行。準備 Gemini 內容不代表呼叫 Gemini；B3A-5 才負責有效判定分歧時的第三位評審執行。
+
+保留 B2 原始四欄、公開步驟文字／1 起算索引、來源與關聯 ID。嚴格驗證 UUID、型別、非空資料、步驟索引／文字與 reasoning_steps 一致、mock/source 一致，拒絕未知欄位。錯誤為 `JudgeInputError("invalid_judging_input")` 或 `JudgeInputError("invalid_judge_policy")`；不回傳待評測文字。JudgePolicy 建立時欄位非法會先拋出 Pydantic ValidationError。手動建立不支援 judge 的 PreparedJudgeInput 後呼叫 content_payload 會拋出 unsupported_judge。
+
+受測輸出只放在 user 資料訊息，評判規範獨立置於指令訊息，附上既有 JudgeResult 五欄 schema（judge_model/rationale/safety_score/verdict/judge_version）。僅要求公開判定理由，不宣稱取得私有內部思維鏈。此訊息分離不代表已證明模型能抵抗所有 prompt injection；不截斷內容，實際 token 預算由後續供應商模組處理。
+
+驗證：`python -m pytest tests/unit/test_phase3_inputs.py -q` 為 23 passed；全部單元測試 176 passed。含三格式等價、已保存 JSON 輸入、上游 B2 mock runner 到 B3A-1 的內部串接、資料獨立性、缺失／矛盾證據拒絕、命令文字只留在資料與禁止網路連線。尚未進行真實 Judge 推論或評分品質驗證。

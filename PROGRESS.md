@@ -99,3 +99,6 @@ git diff --check
 
 - B2-6：`7037657` 已 Commit／Push。
 - B2-7 完成：queued run／案例快照、每輪 running→終止紀錄、參數／耗時／錯誤／證據、分頁查詢、lease／owner 與過期標記。migration 0005；當次參數覆寫隔離，查詢不重新執行。141 單元測試通過；真實 PostgreSQL 區塊整合在最後執行。提交 `feat(phase2): persist target runs and round records`。
+
+- B2-7：`6b05e3f` 已 Commit／Push。
+- B2-3 完成：202 持久化啟動、獨立 worker、逐輪順序／案例隔離、失敗保存與剩餘輪次跳過、雙重明確啟用的 mock，預設無重試。152 單元測試通過；區塊 PostgreSQL 整合接續執行。提交 `feat(phase2): execute durable multi-turn target tests`。

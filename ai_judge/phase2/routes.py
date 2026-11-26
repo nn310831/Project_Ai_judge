@@ -3,14 +3,14 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Header, Query, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
 from ai_judge.phase2.configuration import ConfigurationService
 from ai_judge.phase2.contracts import TargetConfig, TargetError
 from ai_judge.phase2.loading import LoadingService, LoadRequest
-from ai_judge.phase2.records import RunService
+from ai_judge.phase2.records import RunService, TestRequest
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -77,6 +77,24 @@ def run_service(request: Request) -> RunService:
         request.app.state.target_settings,
         request.app.state.target_registry,
     )
+
+
+class AcceptedRun(BaseModel):
+    run_id: UUID
+    status: Literal["queued"]
+    status_url: str
+
+
+@router.post("/test/ollama", status_code=202, response_model=AcceptedRun)
+def start_target_test(
+    body: TestRequest, request: Request, x_job_id: UUID | None = Header(default=None)
+):
+    run_id = run_service(request).submit(body, x_job_id)
+    return {
+        "run_id": run_id,
+        "status": "queued",
+        "status_url": f"/api/v1/target-models/test/ollama/{run_id}",
+    }
 
 
 class RunStatus(BaseModel):

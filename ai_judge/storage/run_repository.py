@@ -199,6 +199,26 @@ class RunRepository:
         run = self.get(run_id)
         if error:
             status = "failed"
+            self.connection.execute(
+                target_cases.update()
+                .where(
+                    target_cases.c.run_id == run_id,
+                    target_cases.c.status.in_(["queued", "running"]),
+                )
+                .values(status="interrupted", error=error)
+            )
+            self.connection.execute(
+                target_rounds.update()
+                .where(
+                    target_rounds.c.run_id == run_id,
+                    target_rounds.c.status == "running",
+                )
+                .values(
+                    status="interrupted",
+                    error="inference_state_unknown",
+                    finished_at=datetime.now(UTC),
+                )
+            )
         elif run["completed_cases"] != run["total_cases"]:
             raise TargetError("run_incomplete", 409)
         elif run["failed_cases"] == run["total_cases"]:

@@ -302,3 +302,27 @@ kernel 可選 `linear: S=XXᵀ` 或 `rbf: Sᵢⱼ=exp(-gamma*||xᵢ-xⱼ||²)`�
 | `/api/v1/target-models/test/ollama/{run_id}/cases/{case_id}/rounds` | `{"items":[{run_id,case_id,round_number,status,request,response,evidence,error,elapsed_ms,attempts,created_at,finished_at}],"limit":20,"offset":0}` |
 
 兩個清單使用 query limit（預設 20，1～100）、offset（預設 0，≥0），無 body；status 無 query/body。空頁或沒有輪次回傳 items=[]。尚未完成的 response/evidence/error/elapsed_ms/finished_at 可為 null。status 範例核心欄位 `{"id":"<UUID>","status":"queued","total_cases":2,"completed_cases":0,"failed_cases":0}`，其餘時間及 execution 依實際快照補齊，完整 schema 見 OpenAPI。完成案例包含失敗案例，failed_cases 另外計數；不將失敗視為 SAFE。B2-3 將接上 POST 啟動入口與 worker。
+
+### B2-3：多輪測試啟動與獨立 worker
+
+`POST /api/v1/target-models/test/ollama`，需 Bearer token，無 query/path；可選 UUID header `X-Job-ID` 作為 run ID。body：
+
+```json
+{"load_id":"<B2-2 load UUID>","sliding_window":true,"model_parameters":{"temperature":0.2,"seed":42},"use_mock":false}
+```
+
+只有 load_id 必填。202 回傳 `{"run_id":"<UUID>","status":"queued","status_url":"/api/v1/target-models/test/ollama/<UUID>"}`，表示任務已持久化，尚非推論完成。此請求只提交任務；需另開終端機，以相同資料庫及端點允許清單啟動 worker：
+
+```sh
+python -m ai_judge.phase2.worker
+# 單次領取至多一個 queued 任務後退出：
+python -m ai_judge.phase2.worker --once
+```
+
+worker 不需要本專案 FastAPI 正在執行；`--poll-seconds` 預設 2（0.1～60）只控制閒置輪詢。它直接使用 `TargetRunner.run_once()`，沒有對自身 HTTP 呼叫或 subprocess CLI。實際模型服務仍需可用。每個 worker 依序處理案例／輪次；可啟動多個 worker，由 PostgreSQL 防止重複領取。
+
+POST 錯誤：404 load_not_found；403 target_mock_not_enabled／endpoint_not_allowed；409 run_id_exists；422 invalid_effective_parameters／unsupported_provider 或 FastAPI validation detail；401／503 同上述授權及儲存錯誤。推論錯誤發生於 worker，保存在查詢結果，不能以 POST 202 判定模型成功。
+
+每輪最多呼叫一次，失敗不重試、不切換 mock；該案例剩餘輪次記為 skipped（attempts=0），下一案例使用獨立上下文繼續。全部成功為 succeeded、全部案例失敗為 failed、部分失敗為 partial；worker 中斷待其他 worker 清理過期 lease 後為 interrupted。尚未清理時 GET 保留 running 及 lease_expires_at。completed_rounds 是已處理輪次（包含 skipped），不是成功輪次。每輪保存當次 query/messages、參數、模型來源、公開回覆／標準化四欄、Path A/B 證據、錯誤及耗時；timeout 或傳輸失敗沒有回覆時保留 null，不偽造內容。
+
+模擬程式位於 runner.py 上半部且註明預設停用。只有本機 `AI_JUDGE_TARGET_MOCK_ENABLED=true` 且 request `use_mock=true` 才使用；結果保留 mock/source 標記。正式模式使用 Ollama Adapter，目前以 HTTP transport 替身驗證，未宣稱測過實際模型品質。

@@ -2,8 +2,18 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 
 metadata = sa.MetaData()
-SCHEMA_REVISION = "0002_phase1_jobs"
+SCHEMA_REVISION = "0003_target_configs"
 json_type = sa.JSON().with_variant(JSONB(), "postgresql")
+
+target_configs = sa.Table(
+    "target_configs",
+    metadata,
+    sa.Column("id", sa.Uuid(), primary_key=True),
+    sa.Column("payload", json_type, nullable=False),
+    sa.Column(
+        "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+    ),
+)
 
 attack_jobs = sa.Table(
     "attack_jobs",

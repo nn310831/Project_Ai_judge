@@ -238,3 +238,20 @@ kernel 可選 `linear: S=XXᵀ` 或 `rbf: Sᵢⱼ=exp(-gamma*||xᵢ-xⱼ||²)`�
 區塊 PR：[PR #2](https://github.com/nn310831/Project_Ai_judge/pull/2)，目標 develop，依賴共同區塊 PR #1，等待檢閱。
 
 共用儲存新增的內部介面還包括 `Repository.random_template(risk_subcategory) -> StoredTemplate|None`、`start_job(id, kind) -> bool`、`update_job_progress(id, processed, total)`、`finish_job(id, status, result)`、`get_job(id) -> dict|None`；均須在 C-1 交易內使用。start_job 以主鍵衝突安全插入，finish_job 只允許從 running 轉為終止狀態，避免重複完成或覆蓋結果。
+
+
+## 區塊 2：受測模型（逐模組交付）
+
+後續 E2E-1 將直接呼叫本區塊內部 Service；Service 不依賴 FastAPI Request／Response、不以自身 HTTP 串接。區塊 2 先提供 Ollama，其他 provider 僅預留 registry 擴充。
+
+### B2-1：標準化模型設定
+
+本區塊所有 HTTP API 要求 `Authorization: Bearer <AI_JUDGE_TARGET_API_TOKEN>`；token 僅存本機環境，不進資料庫。未設定 token 回傳 503 `target_api_not_configured`；缺少／錯誤 token 回傳 401 `unauthorized`。部署前以環境變數設定 token，並設定 `AI_JUDGE_TARGET_ALLOWED_BASE_URLS` JSON 字串陣列（預設 `["http://127.0.0.1:11434"]`）。BASE API 必須精確符合允許清單，禁止 URL 內含憑證、query、fragment。這是授權的內部管理入口；不開放匿名任意外部端點。
+
+- `POST /api/v1/target-models/config/ollama`：body `{"provider":"ollama","base_url":"http://127.0.0.1:11434","model":"your-model:tag","parameters":{"temperature":0.7,"top_p":0.9,"num_predict":2048}}`；無 path/query。201 回傳 `{"model_config_id":"<UUID>","configuration":{...完整生效設定...}}`。
+- `GET /api/v1/target-models/config/ollama/{model_config_id}`：UUID path、無 body/query；200 回傳相同 schema。查無 404 `{"error":"model_config_not_found"}`。
+- POST／GET 不做任何模型推論。配置只建立不可變的新 ID，不提供原地修改。端點不允許 403 `endpoint_not_allowed`；非法參數／provider 回傳 422 FastAPI validation detail。這些設定不含 API Key。
+
+設定欄位：provider 固定 ollama、base_url／model 必填非空字串、model_version 可選；timeout_seconds 預設 30（1～60 秒）、context_max_characters 預設 24000（512～256000）、window_turns 預設 6（1～100）、max_response_bytes 預設 1000000（100～5000000）。parameters 白名單：temperature 0～2（預設 .7）、top_p >0 且 ≤1（.9）、top_k 1～200（40）、num_predict 1～8192（2048）、num_ctx 512～131072（8192）、seed -1～2^31−1（0）；num_predict 必須小於 num_ctx。不接受未知參數或 bool 冒充整數。這些上限為工程限制，不是已確認研究設定。
+
+內部 `ConfigurationService(database, TargetSettings).create(TargetConfig) -> UUID`、`.get(UUID) -> TargetConfig`；經 C-1 `TargetRepository` 保存。新增 migration `0003_target_configs`／target_configs（UUID、payload JSONB、created_at）。token 是整個管理 API 的共享授權，尚非多租戶 ACL。

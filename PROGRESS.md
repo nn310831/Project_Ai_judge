@@ -75,3 +75,12 @@ git diff --check
 
 - 整合 Commit `5ca7a2e` 的 [Push 檢查](https://github.com/nn310831/Project_Ai_judge/actions/runs/45641803953/job/139302149881) 與 [PR 檢查](https://github.com/nn310831/Project_Ai_judge/actions/runs/45641946500/job/139302666451) 均已確認 success。
 - 本次測試容器與專用網路已以 `docker compose -p ai-judge-c1-test -f compose.test.yaml down` 移除。
+
+
+## 區塊 2（2026-11-26）
+
+- 依更新後第 4.5／4.6 節開發；此次只完成 B2，不提前實作 E2E-1 或 B3／B4。
+- 分支 `feature/phase2-target-testing`，基於區塊 1 的 57081dc；遠端 main／develop 仍為 245ef66。新版計畫納入本次版本，其餘使用者修改（.gitignore、B1 generation／sampling、repository 及 test_storage）保留且不提交。
+- 實作順序依內部相依性安排 B2-1、B2-2、B2-4、B2-5、B2-6、B2-7、B2-3，不改原始模組編號；每模組測試後立即 Commit／Push。
+- 開始前既有單元測試 97 passed。
+- B2-1 完成：不可變模型設定、參數白名單、受保護 API、端點允許清單、migration 0003；配置不呼叫模型。單元測試 108 passed；新增／修改程式 lint 通過。Commit 訊息 `feat(phase2): implement target model configuration`，Hash 於下一紀錄補入。

@@ -12,6 +12,9 @@ from ai_judge.phase1.operations import Operations
 from ai_judge.phase1.routes import router
 from ai_judge.phase1.sampling import SamplingService, SamplingSettings
 from ai_judge.phase1.settings import Phase1Settings
+from ai_judge.phase2.contracts import TargetError
+from ai_judge.phase2.routes import router as target_router
+from ai_judge.phase2.settings import TargetSettings
 from ai_judge.storage.database import Database, StorageError, create_database_engine
 from ai_judge.storage.tables import SCHEMA_REVISION
 
@@ -27,11 +30,13 @@ def create_app(
     generator: Generator | None = None,
     genai_settings: GenAISettings | None = None,
     sampling_settings: SamplingSettings | None = None,
+    target_settings: TargetSettings | None = None,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.database = database or Database(create_database_engine(Settings()))
         app.state.phase1_settings = phase1_settings or Phase1Settings()
+        app.state.target_settings = target_settings or TargetSettings()
         settings = genai_settings or GenAISettings()
         client = httpx.Client(
             follow_redirects=False, trust_env=False, timeout=settings.timeout_seconds
@@ -50,6 +55,11 @@ def create_app(
 
     app = FastAPI(title="AI Judge", version="0.1.0", lifespan=lifespan)
     app.include_router(router)
+    app.include_router(target_router)
+
+    @app.exception_handler(TargetError)
+    async def target_error_handler(request, error):
+        return JSONResponse(status_code=error.status, content={"error": error.code})
 
     @app.get("/health/live", response_model=Health, tags=["C-1"])
     def live():

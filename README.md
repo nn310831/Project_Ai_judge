@@ -335,3 +335,6 @@ POST 錯誤：404 load_not_found；403 target_mock_not_enabled／endpoint_not_al
 先執行 `alembic upgrade head` 升級到 0005；FastAPI、worker 及 Ollama 是不同程序，worker 與 FastAPI 使用同一 PostgreSQL。此專案的測試 compose 只啟動 PostgreSQL，並未將整個專案容器化。沒有背景 worker 時任務會保持 queued；程序中斷不自動重播推論，需保留紀錄後明確建立新的 run。
 
 本次只完成區塊 2。受測模型輸出與公開說明可查詢，但雙軌評判、分數、統計報告及單一完整評測啟動 API，依序留待區塊 3、區塊 4 與 E2E-1。現有 ConfigurationService、LoadingService、RunService、TargetRunner 與標準化函式供後續共用 Orchestrator 直接串接。
+
+
+區塊 2 交付：[PR #3](https://github.com/nn310831/Project_Ai_judge/pull/3)，目標 develop，依賴 PR #2／#1，尚未合併。每模組的 Commit 與驗證紀錄見 [PROGRESS.md](PROGRESS.md)。

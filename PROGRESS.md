@@ -1,6 +1,6 @@
 # 開發進度
 
-更新日期：2026-11-26（Asia/Taipei）。區塊 2 七個模組均已獨立測試、Commit、Push；165 項完整測試通過，正在完成 PR 交付。完成後停止於區塊 2，等待使用者指示下一區塊。
+更新日期：2026-11-26（Asia/Taipei）。區塊 2 七個模組均已獨立測試、Commit、Push；165 項完整測試通過，已建立 PR #3。停止於區塊 2，等待使用者指示下一區塊。
 
 ## Repository 與分支
 
@@ -115,3 +115,13 @@ git diff --check
 - `ruff check ai_judge migrations tests` 通過；B2 所有檔案 format 通過。工作目錄全域 format 僅因使用者未提交的 B1 generation 註解尾端空白失敗，未改寫該檔案；另以提交快照驗證遠端版本。
 - 尚未執行真實 Ollama／付費 GenAI；HTTP protocol 使用 transport 替身，持久化使用真實 PostgreSQL；mock 預設仍停用。
 - E2E-1 未開始，待 B3／B4 完成後實作共用 Orchestrator、完整啟動 API／CLI、雙軌及報告查詢。本次沒有提前實作或修改研究方法。
+
+
+## 區塊 2 交付追蹤
+
+- 目前分支：`feature/phase2-target-testing`；既有 Repository、Remote、main／develop 均維持原狀。
+- 整合 Commit：`f14815b`；[PR #3](https://github.com/nn310831/Project_Ai_judge/pull/3) 目標 develop，依賴 #2／#1，未合併。所有七模組 Commit 均已推送。
+- 使用 `git archive HEAD` 建立乾淨的提交快照再次驗證：165 passed、0 skipped；全域 Ruff lint 與 format 均通過（61 個 Python 檔案）。此結果不依賴使用者的五個未提交修改檔案。
+- 整合 Commit 的 [Push CI](https://github.com/nn310831/Project_Ai_judge/actions/runs/45848992522/job/140010046132) 已確認 success；[PR CI](https://github.com/nn310831/Project_Ai_judge/actions/runs/45849096372/job/140010411877) 建立後執行中，最新結果以 PR checks 為準。交付紀錄另以 docs Commit 推送，不 amend／force push。
+- 專用 PostgreSQL 測試容器與網路已執行 compose down 移除；未讀取或操作 compose.dev.yaml 或開發資料庫。
+- 本次沒有阻擋後續的測試失敗；真實 Ollama 品質、B3／B4 與 E2E-1 尚未驗收。收到下一區塊指示前不繼續實作。
